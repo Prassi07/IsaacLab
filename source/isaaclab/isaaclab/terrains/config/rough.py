@@ -20,8 +20,8 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
     use_cache=False,
     sub_terrains={
         "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
-            proportion=0.2,
-            step_height_range=(0.05, 0.23),
+            proportion=0.15,
+            step_height_range=(0.05, 0.25),
             step_width=0.3,
             platform_width=3.0,
             border_width=1.0,

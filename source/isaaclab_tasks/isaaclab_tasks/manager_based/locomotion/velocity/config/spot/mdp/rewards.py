@@ -82,6 +82,40 @@ def base_linear_velocity_reward(
     velocity_scaling_multiple = torch.clamp(1.0 + ramp_rate * (vel_cmd_magnitude - ramp_at_vel), min=1.0)
     return torch.exp(-lin_vel_error / std) * velocity_scaling_multiple
 
+def standing_reward(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, std: float, velocity_threshold: float = 0.25
+) -> torch.Tensor:
+    
+    """Reward tracking of for 0 velocity using abs exponential kernel."""
+     
+    # Extract the asset (make sure type hints match your actual classes)
+    asset: RigidObject = env.scene[asset_cfg.name] # Replace PlaceholderRigidObject with RigidObject
+
+    # Get commanded linear velocity (x, y)
+    target_vel_xy = env.command_manager.get_command("base_velocity")[:, :2]
+    
+    # Get current linear velocity (x, y) in base frame
+    current_vel_xy = asset.data.root_lin_vel_b[:, :2]
+
+    # Calculate the magnitude (speed) of commanded and current velocities
+    target_speed = torch.linalg.norm(target_vel_xy, dim=1)
+    current_speed = torch.linalg.norm(current_vel_xy, dim=1)
+
+    # --- Core Logic ---
+    # 1. Check if the command is to stand still (magnitude below threshold)
+    #    Result is a boolean tensor (True where command is near zero)
+    is_command_zero = (target_speed < velocity_threshold)
+
+    # 2. Calculate the reward potential based on how close the *current* speed is to zero
+    #    using an exponential kernel. Reward is high (near 1.0) when current_speed is near zero.
+    standing_potential = torch.exp(-current_speed / std)
+
+    # 3. Grant the reward *only* when the command was effectively zero.
+    #    Multiply the potential reward by the boolean mask (converted to float: True->1.0, False->0.0)
+    reward = standing_potential * is_command_zero.float()
+
+    return reward
+
 
 class GaitReward(ManagerTermBase):
     """Gait enforcing reward term for quadrupeds.
