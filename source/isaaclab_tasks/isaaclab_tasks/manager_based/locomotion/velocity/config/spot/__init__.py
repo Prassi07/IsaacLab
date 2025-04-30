@@ -36,7 +36,7 @@ gym.register(
 
 gym.register(
     id="Isaac-Velocity-Rough-Spot-v0",
-    entry_point="omni.isaac.lab.envs:ManagerBasedRLEnv",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": rough_env_cfg.SpotRoughEnvCfg,
@@ -46,7 +46,7 @@ gym.register(
 
 gym.register(
     id="Isaac-Velocity-Rough-Spot-Play-v0",
-    entry_point="omni.isaac.lab.envs:ManagerBasedRLEnv",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": rough_env_cfg.SpotRoughEnvCfg_PLAY,
@@ -56,7 +56,7 @@ gym.register(
 
 gym.register(
     id="Isaac-Velocity-Flat-Hs-Spot-v0",
-    entry_point="omni.isaac.lab.envs:ManagerBasedRLEnv",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": flat_hs_env_cfg.SpotFlatHsEnvCfg,
@@ -66,7 +66,7 @@ gym.register(
 
 gym.register(
     id="Isaac-Velocity-Flat-Hs-Spot-Play-v0",
-    entry_point="omni.isaac.lab.envs:ManagerBasedRLEnv",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": flat_hs_env_cfg.SpotFlatHsEnvCfg_PLAY,
