@@ -11,6 +11,7 @@ specify the reward function and its parameters.
 
 from __future__ import annotations
 
+from isaaclab.utils.math import quat_rotate_inverse
 import torch
 from typing import TYPE_CHECKING
 
@@ -314,3 +315,51 @@ def joint_velocity_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) ->
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[asset_cfg.name]
     return torch.linalg.norm((asset.data.joint_vel), dim=1)
+
+
+def body_termination_penalty(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Penalize undesired contacts as the number of violations that are above a threshold."""
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # check if contact force is above threshold
+    net_contact_forces = contact_sensor.data.net_forces_w_history
+    is_contact = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
+    
+    # if(torch.sum(is_contact, dim=1) > 0):
+    #     return torch.ones(is_contact.size(dim=0))
+    # else:
+    #     return torch.zeros(is_contact.size(dim=0))
+    
+    violation_present = torch.sum(is_contact, dim=1) > 0
+    return violation_present.float()
+
+
+
+# Pedipulation Rewards - Task based
+def pedipulation_goal_reward(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    leg_asset_cfg: SceneEntityCfg,
+    std: float,
+) -> torch.Tensor:
+    """Reward Foot Reaching the Goal. (left leg for now)"""
+    # extract the used quantities (to enable type-hinting)
+    
+    asset: Articulation = env.scene[asset_cfg.name]
+    leg: RigidObject = env.scene[leg_asset_cfg.name]
+    
+    target_b = env.command_manager.get_command("foot_position")
+    
+    curr_pos_w = leg.data.body_pos_w[:, leg_asset_cfg.body_ids, :].squeeze()
+    # print("LEG: ", curr_pos_w.size())
+    
+    robot_pos_w = asset.data.root_pos_w
+    robot_quat_w = asset.data.root_quat_w
+    # print("BODy: ", robot_pos_w.size(), robot_quat_w.size())
+    
+    curr_pos_b = quat_rotate_inverse(robot_quat_w, curr_pos_w - robot_pos_w)
+    
+    pos_error = torch.linalg.norm((target_b - curr_pos_b), dim = 1)
+
+    return torch.exp(-pos_error / std)
+

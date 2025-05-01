@@ -1,0 +1,361 @@
+# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+import isaaclab.sim as sim_utils
+import isaaclab.terrains as terrain_gen
+from isaaclab.envs import ViewerCfg
+from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import ObservationGroupCfg as ObsGroup
+from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.managers import RewardTermCfg, SceneEntityCfg
+from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
+from isaaclab.terrains import TerrainImporterCfg
+from isaaclab.utils import configclass
+from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
+from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+
+import isaaclab_tasks.manager_based.locomotion.velocity.config.spot.mdp as spot_mdp
+import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
+from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg, MySceneCfg, PedipulationEnvCfg
+
+##
+# Pre-defined configs
+##
+from isaaclab_assets.robots.spot import SPOT_CFG  # isort: skip
+
+COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
+    size=(4.0, 4.0),
+    border_width=10.0,
+    num_rows=50,
+    num_cols=50,
+    horizontal_scale=0.1,
+    vertical_scale=0.005,
+    slope_threshold=0.75,
+    difficulty_range=(0.0, 1.0),
+    use_cache=False,
+    sub_terrains={
+        "flat": terrain_gen.MeshPlaneTerrainCfg(proportion=0.1),
+        "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
+            proportion=0.6, noise_range=(-0.08, 0.08), noise_step=0.02, border_width=0.25
+        ),
+    },
+)
+
+
+@configclass
+class SpotActionsPedipulateCfg:
+    """Action specifications for the MDP."""
+
+    joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.2, use_default_offset=True)
+
+
+@configclass
+class SpotCommandsPedipulateCfg:
+    """Command specifications for the MDP."""
+
+    foot_position = mdp.UniformPosition3dCommandCfg(
+        asset_name="robot",
+        resampling_time_range=(6.0, 6.0), 
+        debug_vis=True,
+        ranges=mdp.UniformPosition3dCommandCfg.Ranges(
+            pos_x=(0.5, 1.0), pos_y=(0.15, 0.5), pos_z = (0, 0.5))
+        )
+    
+
+@configclass
+class SpotObservationsPedipulateCfg:
+    """Observation specifications for the MDP."""
+
+    @configclass
+    class PolicyCfg(ObsGroup):
+        """Observations for policy group."""
+
+        # `` observation terms (order preserved)
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel, params={"asset_cfg": SceneEntityCfg("robot")}, noise=Unoise(n_min=-0.1, n_max=0.1)
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, params={"asset_cfg": SceneEntityCfg("robot")}, noise=Unoise(n_min=-0.1, n_max=0.1)
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            params={"asset_cfg": SceneEntityCfg("robot")},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        foot_position_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "foot_position"})
+        
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, params={"asset_cfg": SceneEntityCfg("robot")}, noise=Unoise(n_min=-0.05, n_max=0.05)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, params={"asset_cfg": SceneEntityCfg("robot")}, noise=Unoise(n_min=-0.5, n_max=0.5)
+        )
+        actions = ObsTerm(func=mdp.last_action)
+        
+        height_scan =ObsTerm(
+            func = mdp.height_scan,
+            params = {"sensor_cfg":SceneEntityCfg("height_scanner")},
+            noise = Unoise(n_min=-0.1, n_max=0.1),
+            clip=(-1.0, 1.0),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+
+
+@configclass
+class SpotEventPedipulateCfg:
+    """Configuration for randomization."""
+
+    # startup
+    physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "static_friction_range": (0.3, 1.0),
+            "dynamic_friction_range": (0.3, 0.8),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 64,
+        },
+    )
+
+    add_base_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="body"),
+            "mass_distribution_params": (-2.5, 2.5),
+            "operation": "add",
+        },
+    )
+
+    # reset
+    base_external_force_torque = EventTerm(
+        func=mdp.apply_external_force_torque,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="body"),
+            "force_range": (0.0, 0.0),
+            "torque_range": (-0.0, 0.0),
+        },
+    )
+
+    reset_base = EventTerm(
+        func=mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+            "velocity_range": {
+                "x": (-1.5, 1.5),
+                "y": (-1.0, 1.0),
+                "z": (-0.5, 0.5),
+                "roll": (-0.7, 0.7),
+                "pitch": (-0.7, 0.7),
+                "yaw": (-1.0, 1.0),
+            },
+        },
+    )
+
+    reset_robot_joints = EventTerm(
+        func=spot_mdp.reset_joints_around_default,
+        mode="reset",
+        params={
+            "position_range": (-0.2, 0.2),
+            "velocity_range": (-2.5, 2.5),
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+
+    # interval
+    push_robot = EventTerm(
+        func=mdp.push_by_setting_velocity,
+        mode="interval",
+        interval_range_s=(6.0, 9.0),
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)},
+        },
+    )
+    
+    # interval
+    apply_force_leg = EventTerm(
+        func=mdp.apply_external_force_torque,
+        mode="interval",
+        interval_range_s=(6.0, 12.0),
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="fl_foot"),
+            "force_range": (0.0, 12.0),
+            "torque_range": (-0.0, 0.0),
+        }
+    )
+
+
+@configclass
+class SpotRewardsPedipulateCfg:
+    # -- task
+    goal_reward = RewardTermCfg(spot_mdp.pedipulation_goal_reward,
+                                weight=15.0,
+                                params={
+                                    "asset_cfg": SceneEntityCfg("robot"),
+                                    "leg_asset_cfg" : SceneEntityCfg("robot", body_names="fl_foot"),
+                                    "std": 0.8}
+    ) # Weight From Paper
+
+    # -- penalties
+    
+    joint_vel = RewardTermCfg(
+        func=spot_mdp.joint_velocity_penalty,
+        weight=-5.0e-2,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
+    ) # Weight From Paper
+    
+    joint_acc = RewardTermCfg(
+        func=spot_mdp.joint_acceleration_penalty,
+        weight=-5.0e-6,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
+    ) # Weight From Paper
+
+    joint_torques = RewardTermCfg(
+        func=spot_mdp.joint_torques_penalty,
+        weight=-2.0e-5,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},
+    ) # Weight From Paper
+    
+    action_smoothness = RewardTermCfg(func=spot_mdp.action_smoothness_penalty, weight=-0.02) # Weight From Paper
+    
+    robot_link_collision =  RewardTermCfg(
+        func=mdp.undesired_contacts,
+        weight=-2.0,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*uleg"), "threshold": 1.0},
+    )
+    
+    termination_penalty = RewardTermCfg(
+        func=spot_mdp.body_termination_penalty,
+        weight=-80.0,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="body"), "threshold": 1.0},
+    )
+
+
+@configclass
+class SpotTerminationsPedipulateCfg:
+    """Termination terms for the MDP."""
+
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    body_contact = DoneTerm(
+        func=mdp.illegal_contact,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["body", ".*leg"]), "threshold": 1.0},
+    )
+    terrain_out_of_bounds = DoneTerm(
+        func=mdp.terrain_out_of_bounds,
+        params={"asset_cfg": SceneEntityCfg("robot"), "distance_buffer": 3.0},
+        time_out=True,
+    )
+
+
+@configclass
+class SpotCurriculumPedipulateCfg:
+    """Curriculum terms for the MDP."""
+    
+    pass
+
+
+@configclass
+class SpotPedipulatePPORunnerCfg(PedipulationEnvCfg):
+
+    # Basic settings'
+    scene: MySceneCfg = MySceneCfg(num_envs = 4096, env_spacing = 2.5)
+    observations: SpotObservationsPedipulateCfg = SpotObservationsPedipulateCfg()
+    actions: SpotActionsPedipulateCfg = SpotActionsPedipulateCfg()
+    commands: SpotCommandsPedipulateCfg = SpotCommandsPedipulateCfg()
+    
+    # MDP setting
+    rewards: SpotRewardsPedipulateCfg = SpotRewardsPedipulateCfg()
+    terminations: SpotTerminationsPedipulateCfg = SpotTerminationsPedipulateCfg()
+    events: SpotEventPedipulateCfg = SpotEventPedipulateCfg()
+    curriculum: SpotCurriculumPedipulateCfg = SpotCurriculumPedipulateCfg()
+
+
+    def __post_init__(self):
+        # post init of parent
+        super().__post_init__()
+
+        # general settings
+        self.decimation = 10  # 50 Hz
+        self.episode_length_s = 20.0
+        # simulation settings
+        self.sim.dt = 0.002  # 500 Hz
+        self.sim.render_interval = self.decimation
+        self.sim.disable_contact_processing = True
+        self.sim.physics_material = self.scene.terrain.physics_material
+        self.sim.physics_material.static_friction = 1.0
+        self.sim.physics_material.dynamic_friction = 1.0
+        self.sim.physics_material.friction_combine_mode = "multiply"
+        self.sim.physics_material.restitution_combine_mode = "multiply"
+        # update sensor update periods
+        # we tick all the sensors based on the smallest update period (physics update period)
+        # self.scene.contact_forces.update_period = self.sim.dt
+
+        if self.scene.height_scanner is not None:
+            self.scene.height_scanner.update_period = self.decimation * self.sim.dt
+        if self.scene.contact_forces is not None:
+            self.scene.contact_forces.update_period = self.sim.dt
+            
+        # terrain
+        self.scene.terrain = TerrainImporterCfg(
+            prim_path="/World/ground",
+            terrain_type="generator",
+            terrain_generator=COBBLESTONE_ROAD_CFG,
+            max_init_terrain_level=COBBLESTONE_ROAD_CFG.num_rows - 1,
+            collision_group=-1,
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply",
+                restitution_combine_mode="multiply",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+            ),
+            visual_material=sim_utils.MdlFileCfg(
+                mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+                project_uvw=True,
+                texture_scale=(0.25, 0.25),
+            ),
+            debug_vis=False,
+        )
+
+        # switch robot to Spot-d
+        self.scene.robot = SPOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+        # no height scan
+        self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/body"
+
+
+class SpotPedipulatePPORunnerCfg_PLAY(PedipulationEnvCfg):
+    def __post_init__(self) -> None:
+        # post init of parent
+        super().__post_init__()
+
+        # make a smaller scene for play
+        self.scene.num_envs = 50
+        self.scene.env_spacing = 2.5
+        # spawn the robot randomly in the grid (instead of their terrain levels)
+        self.scene.terrain.max_init_terrain_level = None
+
+        # reduce the number of terrains to save memory
+        if self.scene.terrain.terrain_generator is not None:
+            self.scene.terrain.terrain_generator.num_rows = 5
+            self.scene.terrain.terrain_generator.num_cols = 5
+            self.scene.terrain.terrain_generator.curriculum = False
+
+        # disable randomization for play
+        self.observations.policy.enable_corruption = False
+        # remove random pushing event
+        # self.events.base_external_force_torque = None
+        # self.events.push_robot = None

@@ -53,3 +53,12 @@ def terrain_levels_vel(
     terrain.update_env_origins(env_ids, move_up, move_down)
     # return the mean terrain level
     return torch.mean(terrain.terrain_levels.float())
+
+def pedipulation_levels_size(
+    env: ManagerBasedRLEnv, env_ids: Sequence[int], asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """
+     Curriculum for Pedipulation, as more success, range of sampled commands goes up 
+    """
+    return torch.zeros(1)
+    

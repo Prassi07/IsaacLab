@@ -8,6 +8,8 @@ import gymnasium as gym
 from . import agents, flat_env_cfg
 from . import rough_env_cfg
 from . import flat_hs_env_cfg
+from . import spot_pedipulate_env_cfg
+
 ##
 # Register Gym environments.
 ##
@@ -71,5 +73,26 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": flat_hs_env_cfg.SpotFlatHsEnvCfg_PLAY,
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:SpotFlatHsPPORunnerCfg",
+    },
+)
+
+
+gym.register(
+    id="Isaac-Pedipulate-Spot-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": spot_pedipulate_env_cfg.SpotPedipulatePPORunnerCfg,
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:SpotPedipulatePPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Isaac-Pedipulate-Spot-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": spot_pedipulate_env_cfg.SpotPedipulatePPORunnerCfg_PLAY,
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:SpotPedipulatePPORunnerCfg",
     },
 )

@@ -8,14 +8,14 @@ from dataclasses import MISSING
 
 from isaaclab.managers import CommandTermCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG
+from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, LEG_POSITION_GOAL_MARKER_CFG
 from isaaclab.utils import configclass
 
 from .null_command import NullCommand
 from .pose_2d_command import TerrainBasedPose2dCommand, UniformPose2dCommand
 from .pose_command import UniformPoseCommand
 from .velocity_command import NormalVelocityCommand, UniformVelocityCommand
-
+from .position_command import UniformPosition3dCommand
 
 @configclass
 class NullCommandCfg(CommandTermCfg):
@@ -246,3 +246,40 @@ class TerrainBasedPose2dCommandCfg(UniformPose2dCommandCfg):
 
     ranges: Ranges = MISSING
     """Distribution ranges for the sampled commands."""
+
+
+@configclass
+class UniformPosition3dCommandCfg(CommandTermCfg):
+    """Configuration for the uniform 2D-pose command generator."""
+
+    class_type: type = UniformPosition3dCommand
+
+    asset_name: str = MISSING
+    """Name of the asset in the environment for which the commands are generated."""
+
+    @configclass
+    class Ranges:
+        """Uniform distribution ranges for the position commands."""
+
+        pos_x: tuple[float, float] = MISSING
+        """Range for the x position (in m)."""
+
+        pos_y: tuple[float, float] = MISSING
+        """Range for the y position (in m)."""
+
+        pos_z: tuple[float, float] = MISSING
+        """Range for the z position (in m).
+
+        """
+
+    ranges: Ranges = MISSING
+    """Distribution ranges for the position commands."""
+
+
+    goal_position_visualizer_cfg: VisualizationMarkersCfg = LEG_POSITION_GOAL_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/position_goal"
+    )
+    """The configuration for the goal pose visualization marker. Defaults to GREEN_ARROW_X_MARKER_CFG."""
+
+    # Set the scale of the visualization markers to (0.2, 0.2, 0.8)
+    goal_position_visualizer_cfg.markers["target"].scale = (0.2, 0.2, 0.2)
