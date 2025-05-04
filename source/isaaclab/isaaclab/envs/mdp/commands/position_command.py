@@ -7,11 +7,12 @@
 
 from __future__ import annotations
 
+from isaaclab.managers.scene_entity_cfg import SceneEntityCfg
 import torch
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from isaaclab.assets import Articulation
+from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import CommandTerm
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.terrains import TerrainImporter
@@ -45,7 +46,9 @@ class UniformPosition3dCommand(CommandTerm):
         # obtain the robot and terrain assets
         # -- robot
         self.robot: Articulation = env.scene[cfg.asset_name]
-
+        self.left_leg_name = cfg.left_leg_name
+        self.right_leg_name = cfg.right_leg_name
+        
         # crete buffers to store the command
         # -- commands: (x, y, z, heading)
         self.pos_command_w = torch.zeros(self.num_envs, 3, device=self.device)
@@ -53,8 +56,10 @@ class UniformPosition3dCommand(CommandTerm):
         
         self.zero_orientations = torch.zeros(self.num_envs, 1)
         # -- metrics
-        self.metrics["error_pos_3d"] = torch.zeros(self.num_envs, device=self.device)
-
+        self.metrics["error_pos_3d_left"] = torch.ones(self.num_envs, device=self.device)
+        self.metrics["error_pos_3d_right"] = torch.ones(self.num_envs, device=self.device)
+    
+        
     def __str__(self) -> str:
         msg = "PositionCommand:\n"
         msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
@@ -67,7 +72,7 @@ class UniformPosition3dCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:
-        """The desired 2D-pose in base frame. Shape is (num_envs, 4)."""
+        """The desired 2D-pose in base frame. Shape is (num_envs, 3)."""
         return self.pos_command_b
 
     """
@@ -76,7 +81,18 @@ class UniformPosition3dCommand(CommandTerm):
 
     def _update_metrics(self):
         # logs data
-        self.metrics["error_pos_3d"] = torch.norm(self.pos_command_w - self.robot.data.root_pos_w, dim=-1)
+        left_leg_idx = self.robot.find_bodies([self.left_leg_name])[0]
+        left_foot_pos_w = self.robot.data.body_pos_w[:, left_leg_idx, :].squeeze()
+        self.metrics["error_pos_3d_left"] = torch.norm(self.pos_command_w - left_foot_pos_w, dim=-1)
+        
+        right_leg_idx = self.robot.find_bodies([self.right_leg_name])[0]
+        right_foot_pos_w = self.robot.data.body_pos_w[:, right_leg_idx, :].squeeze()
+        self.metrics["error_pos_3d_right"] = torch.norm(self.pos_command_w - right_foot_pos_w, dim=-1)
+        
+        # print("---------------------------------------")
+        # print("Ranges: ", self.cfg.ranges.pos_x, self.cfg.ranges.pos_y, self.cfg.ranges.pos_z)
+        # print("---------------------------------------")
+        
 
     def _resample_command(self, env_ids: Sequence[int]):
         # obtain env origins for the environments
@@ -86,8 +102,35 @@ class UniformPosition3dCommand(CommandTerm):
         self.pos_command_w[env_ids, 0] += r.uniform_(*self.cfg.ranges.pos_x)
         self.pos_command_w[env_ids, 1] += r.uniform_(*self.cfg.ranges.pos_y)
         self.pos_command_w[env_ids, 2] += r.uniform_(*self.cfg.ranges.pos_z)
+        
 
 
+    def _update_ranges(self, curriculum_factor: float = 0.2):
+        """Updates the command ranges, potentially for curriculum learning."""
+        # Calculate the new lower bound for pos_x, ensuring it stays within max_ranges
+        
+        def _update_single_range(current_range, max_range, factor, device):
+            new_min = torch.clip(
+                torch.tensor(current_range[0] - factor, device=device),
+                min=max_range[0],
+                max=max_range[1] # Clip against upper bound too
+            ).item()
+            new_max = torch.clip(
+                torch.tensor(current_range[1] + factor, device=device),
+                min=max_range[0], # Clip against lower bound too
+                max=max_range[1]
+            ).item()
+            # Ensure min is still less than or equal to max after clipping
+            return (min(new_min, new_max), max(new_min, new_max))
+
+        # Update pos_x range
+        self.cfg.ranges.pos_x = _update_single_range(self.cfg.ranges.pos_x, self.cfg.max_ranges.pos_x, curriculum_factor, self.device)
+        # Update pos_y range
+        self.cfg.ranges.pos_y = _update_single_range(self.cfg.ranges.pos_y, self.cfg.max_ranges.pos_y, curriculum_factor, self.device)
+        # Update pos_z range
+        self.cfg.ranges.pos_z = _update_single_range(self.cfg.ranges.pos_z, self.cfg.max_ranges.pos_z, curriculum_factor, self.device)
+        
+        
     def _update_command(self):
         """Re-target the position command to the current root state."""
         target_vec = self.pos_command_w - self.robot.data.root_pos_w[:, :3]

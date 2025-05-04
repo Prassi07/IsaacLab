@@ -11,6 +11,7 @@ the curriculum introduced by the function.
 
 from __future__ import annotations
 
+from isaaclab.utils.math import quat_rotate
 import torch
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
@@ -60,5 +61,19 @@ def pedipulation_levels_size(
     """
      Curriculum for Pedipulation, as more success, range of sampled commands goes up 
     """
-    return torch.zeros(1)
+    asset: Articulation = env.scene[asset_cfg.name]
+    
+    left_leg_idx = asset.find_bodies(["fl_foot"])[0]
+    left_foot_pos_w = asset.data.body_pos_w[:, left_leg_idx, :].squeeze()
+        
+    command_term = env.command_manager.get_command("foot_position")
+    command_term_w = quat_rotate(asset.data.root_quat_w[:, :4], command_term[:, :3]) + asset.data.root_pos_w[:, :3]
+    
+    all_errors = torch.norm(left_foot_pos_w - command_term_w, dim=1)
+    mean_error = torch.mean(all_errors)
+    
+    if(mean_error < 0.06):
+        command_term._update_ranges()
+    
+    return mean_error
     

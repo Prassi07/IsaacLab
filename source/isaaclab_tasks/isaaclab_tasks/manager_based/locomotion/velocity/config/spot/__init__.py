@@ -82,7 +82,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": spot_pedipulate_env_cfg.SpotPedipulatePPORunnerCfg,
+        "env_cfg_entry_point": spot_pedipulate_env_cfg.SpotPedipulationTaskCfg,
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:SpotPedipulatePPORunnerCfg",
     },
 )
@@ -92,7 +92,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": spot_pedipulate_env_cfg.SpotPedipulatePPORunnerCfg_PLAY,
+        "env_cfg_entry_point": spot_pedipulate_env_cfg.SpotPedipulationTaskCfg_PLAY,
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:SpotPedipulatePPORunnerCfg",
     },
 )

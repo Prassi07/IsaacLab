@@ -7,6 +7,7 @@ import math
 from dataclasses import MISSING
 
 from isaaclab.managers import CommandTermCfg
+from isaaclab.managers.scene_entity_cfg import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, LEG_POSITION_GOAL_MARKER_CFG
 from isaaclab.utils import configclass
@@ -257,6 +258,10 @@ class UniformPosition3dCommandCfg(CommandTermCfg):
     asset_name: str = MISSING
     """Name of the asset in the environment for which the commands are generated."""
 
+    left_leg_name: str = MISSING
+    
+    right_leg_name: str = MISSING
+    
     @configclass
     class Ranges:
         """Uniform distribution ranges for the position commands."""
@@ -275,6 +280,8 @@ class UniformPosition3dCommandCfg(CommandTermCfg):
     ranges: Ranges = MISSING
     """Distribution ranges for the position commands."""
 
+    max_ranges: Ranges = MISSING
+    """Distribution ranges for the position commands."""
 
     goal_position_visualizer_cfg: VisualizationMarkersCfg = LEG_POSITION_GOAL_MARKER_CFG.replace(
         prim_path="/Visuals/Command/position_goal"

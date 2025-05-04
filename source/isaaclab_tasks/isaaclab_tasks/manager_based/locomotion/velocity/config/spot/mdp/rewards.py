@@ -334,6 +334,42 @@ def body_termination_penalty(env: ManagerBasedRLEnv, threshold: float, sensor_cf
     return violation_present.float()
 
 
+def base_linear_z_velocity_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    
+    asset: RigidObject = env.scene[asset_cfg.name]
+    return torch.square(asset.data.root_lin_vel_b[:, 2])
+
+def base_angular_xy_velocity_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    
+    asset: RigidObject = env.scene[asset_cfg.name]
+    return torch.norm(asset.data.root_ang_vel_b[:, :2], dim=1)
+
+def joint_acceleration_square_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Penalize joint accelerations on the articulation."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    acc_norm = torch.linalg.norm((asset.data.joint_acc), dim=1)
+    return torch.square(acc_norm)
+
+
+def joint_torques_square_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Penalize joint torques on the articulation."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    torq_norm = torch.linalg.norm((asset.data.applied_torque), dim=1)
+    return torch.square(torq_norm)
+
+def joint_velocity_square_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Penalize joint velocities on the articulation."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    vel_norm = torch.linalg.norm((asset.data.joint_vel), dim=1)
+    return torch.square(vel_norm)
+
+def action_smoothness_square_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Penalize large instantaneous changes in the network action output"""
+    act_norm =torch.linalg.norm((env.action_manager.action - env.action_manager.prev_action), dim=1)
+    return torch.square(act_norm)
 
 # Pedipulation Rewards - Task based
 def pedipulation_goal_reward(

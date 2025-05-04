@@ -58,11 +58,18 @@ class SpotCommandsPedipulateCfg:
 
     foot_position = mdp.UniformPosition3dCommandCfg(
         asset_name="robot",
-        resampling_time_range=(6.0, 6.0), 
+        left_leg_name="fl_foot",
+        right_leg_name="fr_foot",
+        resampling_time_range=(9.0, 18.0), 
         debug_vis=True,
+        # ranges=mdp.UniformPosition3dCommandCfg.Ranges(
+        #     pos_x=(0.0, 0.6), pos_y=(0.0, 0.3), pos_z = (-0.5, 0.25)), # In Robot's base_frame
         ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-            pos_x=(0.5, 1.0), pos_y=(0.15, 0.5), pos_z = (0, 0.5))
+            pos_x=(0.25, 0.75), pos_y=(0, 0.5), pos_z = (0, 0.75)),
+        max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
+            pos_x=(0.25, 1.25), pos_y=(0, 0.75), pos_z = (0, 0.75))
         )
+        
     
 
 @configclass
@@ -153,10 +160,10 @@ class SpotEventPedipulateCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+            "pose_range": {},
             "velocity_range": {
-                "x": (-1.5, 1.5),
-                "y": (-1.0, 1.0),
+                "x": (-0.5, 0.5),
+                "y": (-0.5, 0.5),
                 "z": (-0.5, 0.5),
                 "roll": (-0.7, 0.7),
                 "pitch": (-0.7, 0.7),
@@ -179,7 +186,7 @@ class SpotEventPedipulateCfg:
     push_robot = EventTerm(
         func=mdp.push_by_setting_velocity,
         mode="interval",
-        interval_range_s=(6.0, 9.0),
+        interval_range_s=(9.0, 12.0),
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)},
@@ -190,7 +197,7 @@ class SpotEventPedipulateCfg:
     apply_force_leg = EventTerm(
         func=mdp.apply_external_force_torque,
         mode="interval",
-        interval_range_s=(6.0, 12.0),
+        interval_range_s=(13.0, 13.0),
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="fl_foot"),
             "force_range": (0.0, 12.0),
@@ -212,36 +219,45 @@ class SpotRewardsPedipulateCfg:
 
     # -- penalties
     
+    base_linear_z_velocity = RewardTermCfg(
+        func=spot_mdp.base_linear_z_velocity_penalty,
+        weight=-2.0,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+    base_angular_xy_velocity = RewardTermCfg(
+        func=spot_mdp.base_angular_xy_velocity_penalty,
+        weight=-0.05,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
     joint_vel = RewardTermCfg(
-        func=spot_mdp.joint_velocity_penalty,
-        weight=-5.0e-2,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
+        func=spot_mdp.joint_velocity_square_penalty,
+        weight=-0.04,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},
     ) # Weight From Paper
     
     joint_acc = RewardTermCfg(
-        func=spot_mdp.joint_acceleration_penalty,
+        func=spot_mdp.joint_acceleration_square_penalty,
         weight=-5.0e-6,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},
     ) # Weight From Paper
 
     joint_torques = RewardTermCfg(
-        func=spot_mdp.joint_torques_penalty,
+        func=spot_mdp.joint_torques_square_penalty,
         weight=-2.0e-5,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},
     ) # Weight From Paper
     
-    action_smoothness = RewardTermCfg(func=spot_mdp.action_smoothness_penalty, weight=-0.02) # Weight From Paper
+    action_smoothness = RewardTermCfg(func=spot_mdp.action_smoothness_square_penalty, weight=-0.02) # Weight From Paper
     
     robot_link_collision =  RewardTermCfg(
         func=mdp.undesired_contacts,
         weight=-2.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*uleg"), "threshold": 1.0},
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["body", ".*uleg"]), "threshold": 1.0},
     )
     
     termination_penalty = RewardTermCfg(
-        func=spot_mdp.body_termination_penalty,
-        weight=-80.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="body"), "threshold": 1.0},
+        func=mdp.is_terminated,
+        weight=-200.0,
     )
 
 
@@ -265,11 +281,11 @@ class SpotTerminationsPedipulateCfg:
 class SpotCurriculumPedipulateCfg:
     """Curriculum terms for the MDP."""
     
-    pass
+    pedipulation_range = CurrTerm(func=mdp.pedipulation_levels_size)
 
 
 @configclass
-class SpotPedipulatePPORunnerCfg(PedipulationEnvCfg):
+class SpotPedipulationTaskCfg(PedipulationEnvCfg):
 
     # Basic settings'
     scene: MySceneCfg = MySceneCfg(num_envs = 4096, env_spacing = 2.5)
@@ -294,7 +310,6 @@ class SpotPedipulatePPORunnerCfg(PedipulationEnvCfg):
         # simulation settings
         self.sim.dt = 0.002  # 500 Hz
         self.sim.render_interval = self.decimation
-        self.sim.disable_contact_processing = True
         self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
@@ -327,7 +342,7 @@ class SpotPedipulatePPORunnerCfg(PedipulationEnvCfg):
                 project_uvw=True,
                 texture_scale=(0.25, 0.25),
             ),
-            debug_vis=False,
+            debug_vis=True,
         )
 
         # switch robot to Spot-d
@@ -337,11 +352,12 @@ class SpotPedipulatePPORunnerCfg(PedipulationEnvCfg):
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/body"
 
 
-class SpotPedipulatePPORunnerCfg_PLAY(PedipulationEnvCfg):
+
+class SpotPedipulationTaskCfg_PLAY(SpotPedipulationTaskCfg):
     def __post_init__(self) -> None:
         # post init of parent
         super().__post_init__()
-
+        
         # make a smaller scene for play
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
