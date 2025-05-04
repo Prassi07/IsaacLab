@@ -111,8 +111,8 @@ class SpotPedipulatePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     empirical_normalization = False
     store_code_state = False
     resume = False
-    # load_checkpoint = "model_57200.pt"
-    # load_run = "2025-05-03_20-45-13"
+    # load_checkpoint = "model_5000.pt"
+    # load_run = "2025-05-04_14-51-39"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_hidden_dims=[512, 256, 128],

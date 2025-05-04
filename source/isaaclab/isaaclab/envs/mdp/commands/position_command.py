@@ -105,7 +105,7 @@ class UniformPosition3dCommand(CommandTerm):
         
 
 
-    def _update_ranges(self, curriculum_factor: float = 0.2):
+    def update_curriculums(self, curriculum_factor: float = 0.2):
         """Updates the command ranges, potentially for curriculum learning."""
         # Calculate the new lower bound for pos_x, ensuring it stays within max_ranges
         
