@@ -18,6 +18,15 @@ from isaaclab.markers import VisualizationMarkers
 from isaaclab.terrains import TerrainImporter
 from isaaclab.utils.math import quat_from_euler_xyz, quat_rotate_inverse, wrap_to_pi, yaw_quat
 
+from isaaclab.utils.warp import convert_to_warp_mesh, raycast_mesh
+import isaaclab.sim as sim_utils
+import warp as wp
+from isaacsim.core.prims import XFormPrim
+from pxr import UsdGeom, UsdPhysics
+import omni.log
+from isaaclab.terrains.trimesh.utils import make_plane
+import numpy as np
+
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
@@ -58,7 +67,11 @@ class UniformPosition3dCommand(CommandTerm):
         # -- metrics
         self.metrics["error_pos_3d_left"] = torch.ones(self.num_envs, device=self.device)
         self.metrics["error_pos_3d_right"] = torch.ones(self.num_envs, device=self.device)
-    
+
+        self.mesh_prim_paths = ["/World/ground"]
+        self.meshes = self._initiate_meshes(mesh_prim_paths=self.mesh_prim_paths, device=self.device)
+        
+        self.min_z_offset_from_terrain = 0.1
         
     def __str__(self) -> str:
         msg = "PositionCommand:\n"
@@ -99,10 +112,37 @@ class UniformPosition3dCommand(CommandTerm):
         self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
         # offset the position command by the current root position
         r = torch.empty(len(env_ids), device=self.device)
+        
         self.pos_command_w[env_ids, 0] += r.uniform_(*self.cfg.ranges.pos_x)
         self.pos_command_w[env_ids, 1] += r.uniform_(*self.cfg.ranges.pos_y)
-        self.pos_command_w[env_ids, 2] += r.uniform_(*self.cfg.ranges.pos_z)
         
+        initial_command_z = self._env.scene.env_origins[env_ids, 2] + r.uniform_(*self.cfg.ranges.pos_z)
+        
+        ray_starts_w = torch.zeros((len(env_ids), 3), device=self.device)
+        ray_starts_w[:, :2] = self.pos_command_w[env_ids, :2].clone()
+        ray_starts_w[:, 2] += 10. # offset
+
+        ray_directions_w = torch.zeros_like(ray_starts_w)
+        ray_directions_w[:, 2] = -1.0
+        
+        terrain_hit_coords_w = raycast_mesh(
+            ray_starts_w,
+            ray_directions_w,
+            max_dist=20,
+            mesh=self.meshes[self.mesh_prim_paths[0]],
+        )[0]
+                
+        terrain_hit_z = terrain_hit_coords_w.squeeze(1)[:, 2]
+        # A hit is valid if its Z-coordinate is finite.
+        invalid_terrain_hit_mask = (terrain_hit_z == float('inf'))
+        
+        # Create a mask for environments where clipping is needed
+        clip_up_mask = (initial_command_z < terrain_hit_z) & ~invalid_terrain_hit_mask
+        
+        final_command_z = initial_command_z.clone()
+        final_command_z[clip_up_mask] = terrain_hit_z[clip_up_mask] + self.min_z_offset_from_terrain
+        
+        self.pos_command_w[env_ids, 2] = final_command_z
 
 
     def update_curriculums(self, curriculum_factor: float = 0.2):
@@ -154,3 +194,53 @@ class UniformPosition3dCommand(CommandTerm):
             translations=self.pos_command_w,
             orientations=quat_from_euler_xyz(self.zero_orientations, self.zero_orientations, self.zero_orientations).squeeze()
         )
+        
+    def _initiate_meshes(self, mesh_prim_paths, device): 
+        meshes: dict[str, wp.Mesh] = {}
+        # check number of mesh prims provided
+        if len(mesh_prim_paths) != 1:
+            raise NotImplementedError(
+                f"RayCaster currently only supports one mesh prim. Received: {len(mesh_prim_paths)}"
+            )
+
+        # read prims to ray-cast
+        for mesh_prim_path in mesh_prim_paths:
+            # check if the prim is a plane - handle PhysX plane as a special case
+            # if a plane exists then we need to create an infinite mesh that is a plane
+            mesh_prim = sim_utils.get_first_matching_child_prim(
+                mesh_prim_path, lambda prim: prim.GetTypeName() == "Plane"
+            )
+            # if we did not find a plane then we need to read the mesh
+            if mesh_prim is None:
+                # obtain the mesh prim
+                mesh_prim = sim_utils.get_first_matching_child_prim(
+                    mesh_prim_path, lambda prim: prim.GetTypeName() == "Mesh"
+                )
+                # check if valid
+                if mesh_prim is None or not mesh_prim.IsValid():
+                    raise RuntimeError(f"Invalid mesh prim path: {mesh_prim_path}")
+                # cast into UsdGeomMesh
+                mesh_prim = UsdGeom.Mesh(mesh_prim)
+                # read the vertices and faces
+                points = np.asarray(mesh_prim.GetPointsAttr().Get())
+                indices = np.asarray(mesh_prim.GetFaceVertexIndicesAttr().Get())
+                wp_mesh = convert_to_warp_mesh(points, indices, device=device)
+                # print info
+                omni.log.info(
+                    f"Read mesh prim: {mesh_prim.GetPath()} with {len(points)} vertices and {len(indices)} faces."
+                )
+            else:
+                mesh = make_plane(size=(2e6, 2e6), height=0.0, center_zero=True)
+                wp_mesh = convert_to_warp_mesh(mesh.vertices, mesh.faces, device=device)
+                # print info
+                omni.log.info(f"Created infinite plane mesh prim: {mesh_prim.GetPath()}.")
+            # add the warp mesh to the list
+            meshes[mesh_prim_path] = wp_mesh
+
+        # throw an error if no meshes are found
+        if all([mesh_prim_path not in meshes for mesh_prim_path in mesh_prim_paths]):
+            raise RuntimeError(
+                f"No meshes found for ray-casting! Please check the mesh prim paths: {mesh_prim_paths}"
+            )
+
+        return meshes
