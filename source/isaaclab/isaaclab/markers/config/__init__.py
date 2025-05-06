@@ -130,11 +130,20 @@ POSITION_GOAL_MARKER_CFG = VisualizationMarkersCfg(
     }
 )
 
-LEG_POSITION_GOAL_MARKER_CFG = VisualizationMarkersCfg(
+LEG_POSITION_GOAL_MARKER_CFG_RED = VisualizationMarkersCfg(
     markers={
         "target": sim_utils.SphereCfg(
             radius=0.1,
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),
+        ),
+    }
+)
+
+LEG_POSITION_GOAL_MARKER_CFG_BLUE = VisualizationMarkersCfg(
+    markers={
+        "target": sim_utils.SphereCfg(
+            radius=0.1,
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
         ),
     }
 )

@@ -78,3 +78,39 @@ def pedipulation_levels_size(
     
     return mean_error
     
+
+def pedipulation_multileg_levels_size(
+    env: ManagerBasedRLEnv, env_ids: Sequence[int], asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """
+     Curriculum for Pedipulation, as more success, range of sampled commands goes up 
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    
+    full_command_b = env.command_manager.get_command("foot_position")
+    target_pos_b = full_command_b[:, :3] # Target position in base frame
+    
+    is_right_leg_commanded_mask = (full_command_b[:, 3] == 1.0) 
+    
+    target_pos_w = quat_rotate(asset.data.root_quat_w[:, :4], target_pos_b) + asset.data.root_pos_w[:, :3]
+
+
+    left_leg_idx = asset.find_bodies(["fl_foot"])[0]
+    left_foot_pos_w = asset.data.body_pos_w[:, left_leg_idx, :].squeeze()
+    
+    right_leg_idx = asset.find_bodies(["fr_foot"])[0]
+    right_foot_pos_w = asset.data.body_pos_w[:, right_leg_idx, :].squeeze()
+
+    error_left_leg_w = torch.linalg.norm(left_foot_pos_w - target_pos_w, dim=1)
+    error_right_leg_w = torch.linalg.norm(right_foot_pos_w - target_pos_w, dim=1)
+    
+    all_errors = torch.where(is_right_leg_commanded_mask, error_right_leg_w, error_left_leg_w)
+    
+    mean_error = torch.mean(all_errors)
+    
+    if(mean_error < 0.06):
+        command_term = env.command_manager.get_term("foot_position")
+        command_term.update_curriculums(curriculum_factor = 0.2)
+    
+    return mean_error
+    

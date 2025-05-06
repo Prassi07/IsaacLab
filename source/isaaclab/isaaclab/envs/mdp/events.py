@@ -15,6 +15,7 @@ the event introduced by the function.
 from __future__ import annotations
 
 import math
+from isaaclab.envs.manager_based_rl_env import ManagerBasedRLEnv
 import torch
 from typing import TYPE_CHECKING, Literal
 
@@ -1121,6 +1122,83 @@ def reset_scene_to_default(env: ManagerBasedEnv, env_ids: torch.Tensor):
         # obtain default and set into the physics simulation
         nodal_state = deformable_object.data.default_nodal_state_w[env_ids].clone()
         deformable_object.write_nodal_state_to_sim(nodal_state, env_ids=env_ids)
+
+
+def apply_external_force_torque_left_leg(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor,
+    force_range: tuple[float, float],
+    torque_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["fl_foot"]),
+):
+    """Randomize the external forces and torques applied to the bodies.
+
+    This function creates a set of random forces and torques sampled from the given ranges. The number of forces
+    and torques is equal to the number of bodies times the number of environments. The forces and torques are
+    applied to the bodies by calling ``asset.set_external_force_and_torque``. The forces and torques are only
+    applied when ``asset.write_data_to_sim()`` is called in the environment.
+    """
+    
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+    # resolve environment ids
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device=asset.device)
+    
+    # resolve number of bodies
+    num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else asset.num_bodies
+
+    env.observation_manager.group_obs_concatenate
+    command_applied = env.command_manager.get_command("foot_position") 
+    left_leg_envs_mask = (command_applied[env_ids, 3] == 0)
+    
+    left_leg_envs = env_ids[left_leg_envs_mask]
+
+    # sample random forces and torques
+    size = (len(left_leg_envs), num_bodies, 3)
+    forces = math_utils.sample_uniform(*force_range, size, asset.device)
+    torques = math_utils.sample_uniform(*torque_range, size, asset.device)
+    # set the forces and torques into the buffers
+    # note: these are only applied when you call: `asset.write_data_to_sim()`
+    asset.set_external_force_and_torque(forces, torques, env_ids=left_leg_envs, body_ids=asset_cfg.body_ids)
+    
+def apply_external_force_torque_right_leg(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor,
+    force_range: tuple[float, float],
+    torque_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["fr_foot"]),
+):
+    """Randomize the external forces and torques applied to the bodies.
+
+    This function creates a set of random forces and torques sampled from the given ranges. The number of forces
+    and torques is equal to the number of bodies times the number of environments. The forces and torques are
+    applied to the bodies by calling ``asset.set_external_force_and_torque``. The forces and torques are only
+    applied when ``asset.write_data_to_sim()`` is called in the environment.
+    """
+    
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+    # resolve environment ids
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device=asset.device)
+    
+    # resolve number of bodies
+    num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else asset.num_bodies
+
+    command_applied = env.command_manager.get_command("foot_position") 
+    right_leg_envs_mask = (command_applied[env_ids, 3] == 1)
+    
+    right_leg_envs = env_ids[right_leg_envs_mask]
+
+    # sample random forces and torques
+    size = (len(right_leg_envs), num_bodies, 3)
+    forces = math_utils.sample_uniform(*force_range, size, asset.device)
+    torques = math_utils.sample_uniform(*torque_range, size, asset.device)
+    
+    # set the forces and torques into the buffers
+    # note: these are only applied when you call: `asset.write_data_to_sim()`
+    asset.set_external_force_and_torque(forces, torques, env_ids=right_leg_envs, body_ids=asset_cfg.body_ids)
 
 
 class randomize_visual_texture_material(ManagerTermBase):

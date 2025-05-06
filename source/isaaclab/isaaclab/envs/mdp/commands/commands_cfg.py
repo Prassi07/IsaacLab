@@ -9,7 +9,7 @@ from dataclasses import MISSING
 from isaaclab.managers import CommandTermCfg
 from isaaclab.managers.scene_entity_cfg import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, LEG_POSITION_GOAL_MARKER_CFG
+from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, LEG_POSITION_GOAL_MARKER_CFG_BLUE, LEG_POSITION_GOAL_MARKER_CFG_RED
 from isaaclab.utils import configclass
 
 from .null_command import NullCommand
@@ -283,10 +283,14 @@ class UniformPosition3dCommandCfg(CommandTermCfg):
     max_ranges: Ranges = MISSING
     """Distribution ranges for the position commands."""
 
-    goal_position_visualizer_cfg: VisualizationMarkersCfg = LEG_POSITION_GOAL_MARKER_CFG.replace(
-        prim_path="/Visuals/Command/position_goal"
+    left_goal_position_visualizer_cfg: VisualizationMarkersCfg = LEG_POSITION_GOAL_MARKER_CFG_RED.replace(
+        prim_path="/Visuals/Command/left_position_goal"
     )
-    """The configuration for the goal pose visualization marker. Defaults to GREEN_ARROW_X_MARKER_CFG."""
 
-    # Set the scale of the visualization markers to (0.2, 0.2, 0.8)
-    goal_position_visualizer_cfg.markers["target"].scale = (0.2, 0.2, 0.2)
+    left_goal_position_visualizer_cfg.markers["target"].scale = (0.2, 0.2, 0.2)
+    
+    right_goal_position_visualizer_cfg: VisualizationMarkersCfg = LEG_POSITION_GOAL_MARKER_CFG_BLUE.replace(
+        prim_path="/Visuals/Command/right_position_goal"
+    )
+
+    right_goal_position_visualizer_cfg.markers["target"].scale = (0.2, 0.2, 0.2)

@@ -399,3 +399,50 @@ def pedipulation_goal_reward(
 
     return torch.exp(-pos_error / std)
 
+
+def multileg_pedipulation_reward(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    left_leg_asset_cfg: SceneEntityCfg,
+    right_leg_asset_cfg: SceneEntityCfg,
+    std: float,
+) -> torch.Tensor:
+    """Reward the commanded leg for reaching its 3D position goal in the base frame.
+
+    The command includes which leg to target (0 for left, 1 for right).
+    The reward is calculated based on the distance error of the commanded leg to its target.
+    """
+    
+    # Extract assets
+    robot_asset: Articulation = env.scene[asset_cfg.name]
+    # Note: left_leg_asset_cfg and right_leg_asset_cfg are used to get body_ids for the respective feet.
+    # The actual position data comes from robot_asset.data.body_pos_w using these IDs.
+
+    # Get the 4D command: (local_x, local_y, local_z, leg_switch)
+    # leg_switch is 0 for left, 1 for right.
+    full_command = env.command_manager.get_command("foot_position")
+    target_pos_b = full_command[:, :3]  # Target position in base frame
+    
+    # leg_switch_command will be (num_envs,). True if right leg is commanded.
+    is_right_leg_commanded_mask = (full_command[:, 3] == 1.0)
+
+    # Get current world positions of the feet
+    left_foot_pos_w = robot_asset.data.body_pos_w[:, left_leg_asset_cfg.body_ids, :].squeeze()
+    right_foot_pos_w = robot_asset.data.body_pos_w[:, right_leg_asset_cfg.body_ids, :].squeeze()
+
+    # Get robot's root pose for transformation
+    robot_pos_w = robot_asset.data.root_pos_w
+    robot_quat_w = robot_asset.data.root_quat_w
+
+    # Transform foot positions from world to robot's base frame
+    left_foot_pos_b = quat_rotate_inverse(robot_quat_w, left_foot_pos_w - robot_pos_w)
+    right_foot_pos_b = quat_rotate_inverse(robot_quat_w, right_foot_pos_w - robot_pos_w)
+
+    # Calculate position error for both legs
+    error_left_leg = torch.linalg.norm((target_pos_b - left_foot_pos_b), dim=1)
+    error_right_leg = torch.linalg.norm((target_pos_b - right_foot_pos_b), dim=1)
+
+    # Select the error corresponding to the commanded leg
+    commanded_leg_error = torch.where(is_right_leg_commanded_mask, error_right_leg, error_left_leg)
+
+    return torch.exp(-commanded_leg_error / std)

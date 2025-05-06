@@ -62,12 +62,14 @@ class SpotCommandsPedipulateCfg:
         right_leg_name="fr_foot",
         resampling_time_range=(9.0, 18.0), 
         debug_vis=True,
-        # ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-        #     pos_x=(0.0, 0.6), pos_y=(0.0, 0.3), pos_z = (-0.5, 0.25)), # In Robot's base_frame
         ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-            pos_x=(0.25, 0.75), pos_y=(0, 0.5), pos_z = (0, 0.75)),
+            pos_x=(0.25, 0.75), pos_y=(0, 0.5), pos_z = (0, 0.75)), 
         max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-            pos_x=(0.25, 1.25), pos_y=(0, 0.75), pos_z = (0, 0.75))
+            pos_x=(0.25, 1.25), pos_y=(-0.15, 0.75), pos_z = (0, 0.75)),
+        # ranges=mdp.UniformPosition3dCommandCfg.Ranges(
+        #     pos_x=(0.25, 1.25), pos_y=(0, 0.75), pos_z = (0, 0.75)),
+        # max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
+        #     pos_x=(0.0, 1.75), pos_y=(-0.15, 1.0), pos_z = (0, 0.75))
         )
         
     
@@ -194,14 +196,25 @@ class SpotEventPedipulateCfg:
     )
     
     # interval
-    apply_force_leg = EventTerm(
-        func=mdp.apply_external_force_torque,
+    apply_force_left_leg = EventTerm(
+        func=mdp.apply_external_force_torque_left_leg,
         mode="interval",
         interval_range_s=(13.0, 13.0),
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="fl_foot"),
             "force_range": (0.0, 12.0),
-            "torque_range": (-0.0, 0.0),
+            "torque_range": (0.0, 0.0),
+        }
+    )
+    
+    apply_force_right_leg = EventTerm(
+        func=mdp.apply_external_force_torque_right_leg,
+        mode="interval",
+        interval_range_s=(13.0, 13.0),
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="fr_foot"),
+            "force_range": (0.0, 12.0),
+            "torque_range": (0.0, 0.0),
         }
     )
 
@@ -214,6 +227,15 @@ class SpotRewardsPedipulateCfg:
                                 params={
                                     "asset_cfg": SceneEntityCfg("robot"),
                                     "leg_asset_cfg" : SceneEntityCfg("robot", body_names="fl_foot"),
+                                    "std": 0.8}
+    )
+                                
+    goal_reward = RewardTermCfg(spot_mdp.multileg_pedipulation_reward,
+                                weight=15.0,
+                                params={
+                                    "asset_cfg": SceneEntityCfg("robot"),
+                                    "left_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fl_foot"),
+                                    "right_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fr_foot")"
                                     "std": 0.8}
     ) # Weight From Paper
 
@@ -270,18 +292,18 @@ class SpotTerminationsPedipulateCfg:
         func=mdp.illegal_contact,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["body", ".*leg"]), "threshold": 1.0},
     )
-    terrain_out_of_bounds = DoneTerm(
-        func=mdp.terrain_out_of_bounds,
-        params={"asset_cfg": SceneEntityCfg("robot"), "distance_buffer": 3.0},
-        time_out=True,
-    )
+    # terrain_out_of_bounds = DoneTerm(
+    #     func=mdp.terrain_out_of_bounds,
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "distance_buffer": 3.0},
+    #     time_out=True,
+    # )
 
 
 @configclass
 class SpotCurriculumPedipulateCfg:
     """Curriculum terms for the MDP."""
     
-    pedipulation_range = CurrTerm(func=mdp.pedipulation_levels_size)
+    pedipulation_range = CurrTerm(func=mdp.pedipulation_multileg_levels_size)
 
 
 @configclass
@@ -366,8 +388,8 @@ class SpotPedipulationTaskCfg_PLAY(SpotPedipulationTaskCfg):
 
         # reduce the number of terrains to save memory
         if self.scene.terrain.terrain_generator is not None:
-            self.scene.terrain.terrain_generator.num_rows = 5
-            self.scene.terrain.terrain_generator.num_cols = 5
+            self.scene.terrain.terrain_generator.num_rows = 10
+            self.scene.terrain.terrain_generator.num_cols = 10
             self.scene.terrain.terrain_generator.curriculum = False
 
         # disable randomization for play
