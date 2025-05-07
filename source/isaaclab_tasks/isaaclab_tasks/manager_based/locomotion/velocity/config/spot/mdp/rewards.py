@@ -423,6 +423,9 @@ def multileg_pedipulation_reward(
     full_command = env.command_manager.get_command("foot_position")
     target_pos_b = full_command[:, :3]  # Target position in base frame
     
+    # leg_command = torch.zeros_like(full_command[:, 2])
+    # is_right_leg_commanded_mask = (leg_command == 1.0) 
+    
     # leg_switch_command will be (num_envs,). True if right leg is commanded.
     is_right_leg_commanded_mask = (full_command[:, 3] == 1.0)
 

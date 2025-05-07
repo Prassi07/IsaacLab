@@ -23,7 +23,7 @@ from isaaclab.terrains.trimesh.utils import make_plane
 import numpy as np
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedRLEnv, ManagerBasedEnv
 
     from .commands_cfg import UniformPosition3dCommandCfg
 
@@ -74,7 +74,7 @@ class UniformPosition3dCommand(CommandTerm):
         
         self.min_z_offset_from_terrain = 0.1
         
-        self.last_update_reset_counter = self.reset_count
+        self.last_update_reset_counter = self._env.common_step_counter
         
     def __str__(self) -> str:
         msg = "PositionCommand:\n"
@@ -128,6 +128,11 @@ class UniformPosition3dCommand(CommandTerm):
         # tensor `r_for_sampling` for random sampling, shape: (len(env_ids),)
         r_for_sampling = torch.empty(len(env_ids), device=self.device)
         
+        # self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
+        # self.pos_command_w[env_ids, 0] += r_for_sampling.uniform_(*self.cfg.ranges.pos_x)
+        # self.pos_command_w[env_ids, 1] += r_for_sampling.uniform_(*self.cfg.ranges.pos_y)
+        # self.pos_command_w[env_ids, 2] += r_for_sampling.uniform_(*self.cfg.ranges.pos_z)
+        
         # Determine leg choice
         is_left_leg_mask = r_for_sampling.uniform_(0, 1) < 0.5  # LEFT LEG will be True
         self.leg_switch_command[env_ids, 0] = (~is_left_leg_mask).float()   # LEFT LEG will be 0, Right will be 1
@@ -141,9 +146,9 @@ class UniformPosition3dCommand(CommandTerm):
         self.pos_command_b[env_ids, 1] = final_y_offsets
         
         # Update the world-frame command for ALL environments to be consistent with the current base-frame command
-        self.pos_command_w[:] = self.robot.data.root_pos_w + quat_rotate(self.robot.data.root_quat_w, self.pos_command_b)
+        self.pos_command_w[env_ids, :] = self.robot.data.root_pos_w[env_ids, :] + quat_rotate(self.robot.data.root_quat_w[env_ids, :], self.pos_command_b[env_ids, :])
         
-        initial_command_z = self.pos_command_w[:, 2].clone()
+        initial_command_z = self.pos_command_w[env_ids, 2].clone()
         
         ray_starts_w = torch.zeros((len(env_ids), 3), device=self.device)
         ray_starts_w[:, :2] = self.pos_command_w[env_ids, :2].clone()
@@ -170,14 +175,6 @@ class UniformPosition3dCommand(CommandTerm):
         
         self.pos_command_w[env_ids, 2] = final_command_z
 
-        # # obtain env origins for the environments
-        # self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
-        # # offset the position command by the current root position
-        # r = torch.empty(len(env_ids), device=self.device)
-        
-        # self.pos_command_w[env_ids, 0] += r.uniform_(*self.cfg.ranges.pos_x)
-        # self.pos_command_w[env_ids, 1] += r.uniform_(*self.cfg.ranges.pos_y)
-        # self.pos_command_w[env_ids, 2] += r.uniform_(*self.cfg.ranges.pos_z)
         
 
     def update_curriculums(self, curriculum_factor: float = 0.2):
@@ -198,7 +195,7 @@ class UniformPosition3dCommand(CommandTerm):
             # Ensure min is still less than or equal to max after clipping
             return (min(new_min, new_max), max(new_min, new_max))
 
-        if((self.reset_count - self.last_update_reset_counter) > 50):
+        if((self._env.common_step_counter - self.last_update_reset_counter) > 50):
             # Update pos_x range
             self.cfg.ranges.pos_x = _update_single_range(self.cfg.ranges.pos_x, self.cfg.max_ranges.pos_x, curriculum_factor, self.device)
             # Update pos_y range
@@ -206,7 +203,7 @@ class UniformPosition3dCommand(CommandTerm):
             # Update pos_z range
             self.cfg.ranges.pos_z = _update_single_range(self.cfg.ranges.pos_z, self.cfg.max_ranges.pos_z, curriculum_factor, self.device)
             
-            self.last_update_reset_counter =  self.reset_count
+            self.last_update_reset_counter =  self._env.common_step_counter
         
     def _update_command(self):
         """

@@ -19,7 +19,7 @@ from .manager_base import ManagerBase
 from .manager_term_cfg import EventTermCfg
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedRLEnv
+    from isaaclab.envs import ManagerBasedEnv
 
 
 class EventManager(ManagerBase):
@@ -55,10 +55,10 @@ class EventManager(ManagerBase):
 
     """
 
-    _env: ManagerBasedRLEnv
+    _env: ManagerBasedEnv
     """The environment instance."""
 
-    def __init__(self, cfg: object, env: ManagerBasedRLEnv):
+    def __init__(self, cfg: object, env: ManagerBasedEnv):
         """Initialize the event manager.
 
         Args:

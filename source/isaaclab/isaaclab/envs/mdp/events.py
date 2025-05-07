@@ -15,7 +15,6 @@ the event introduced by the function.
 from __future__ import annotations
 
 import math
-from isaaclab.envs.manager_based_rl_env import ManagerBasedRLEnv
 import torch
 from typing import TYPE_CHECKING, Literal
 
@@ -33,7 +32,7 @@ from isaaclab.managers import EventTermCfg, ManagerTermBase, SceneEntityCfg
 from isaaclab.terrains import TerrainImporter
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
 
 def randomize_rigid_body_scale(

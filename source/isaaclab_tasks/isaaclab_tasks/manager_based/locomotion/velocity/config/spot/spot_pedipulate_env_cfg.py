@@ -44,6 +44,7 @@ COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
     },
 )
 
+from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG, ROUGH_TERRAINS_CFG_2
 
 @configclass
 class SpotActionsPedipulateCfg:
@@ -63,9 +64,9 @@ class SpotCommandsPedipulateCfg:
         resampling_time_range=(9.0, 18.0), 
         debug_vis=True,
         ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-            pos_x=(0.25, 0.75), pos_y=(0, 0.5), pos_z = (0, 0.75)), 
+            pos_x=(0.25, 0.75), pos_y=(0, 0.25), pos_z = (-0.5, 0.0)), 
         max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-            pos_x=(0.25, 1.25), pos_y=(-0.15, 0.75), pos_z = (0, 0.75)),
+            pos_x=(0.0, 1.75), pos_y=(-0.15, 0.75), pos_z = (-0.6, 0.25)),
         # ranges=mdp.UniformPosition3dCommandCfg.Ranges(
         #     pos_x=(0.25, 1.25), pos_y=(0, 0.75), pos_z = (0, 0.75)),
         # max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
@@ -158,11 +159,11 @@ class SpotEventPedipulateCfg:
     )
 
     reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
+        func=mdp.reset_root_state_from_terrain,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pose_range": {},
+            "pose_range": {"yaw" : (-3.14, 3.14)},
             "velocity_range": {
                 "x": (-0.5, 0.5),
                 "y": (-0.5, 0.5),
@@ -221,21 +222,13 @@ class SpotEventPedipulateCfg:
 
 @configclass
 class SpotRewardsPedipulateCfg:
-    # -- task
-    goal_reward = RewardTermCfg(spot_mdp.pedipulation_goal_reward,
-                                weight=15.0,
-                                params={
-                                    "asset_cfg": SceneEntityCfg("robot"),
-                                    "leg_asset_cfg" : SceneEntityCfg("robot", body_names="fl_foot"),
-                                    "std": 0.8}
-    )
-                                
+    # -- task              
     goal_reward = RewardTermCfg(spot_mdp.multileg_pedipulation_reward,
                                 weight=15.0,
                                 params={
                                     "asset_cfg": SceneEntityCfg("robot"),
                                     "left_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fl_foot"),
-                                    "right_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fr_foot")"
+                                    "right_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fr_foot"),
                                     "std": 0.8}
     ) # Weight From Paper
 
@@ -350,8 +343,8 @@ class SpotPedipulationTaskCfg(PedipulationEnvCfg):
         self.scene.terrain = TerrainImporterCfg(
             prim_path="/World/ground",
             terrain_type="generator",
-            terrain_generator=COBBLESTONE_ROAD_CFG,
-            max_init_terrain_level=COBBLESTONE_ROAD_CFG.num_rows - 1,
+            terrain_generator=ROUGH_TERRAINS_CFG_2,
+            max_init_terrain_level=ROUGH_TERRAINS_CFG_2.num_rows - 1,
             collision_group=-1,
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="multiply",
@@ -394,6 +387,10 @@ class SpotPedipulationTaskCfg_PLAY(SpotPedipulationTaskCfg):
 
         # disable randomization for play
         self.observations.policy.enable_corruption = False
+        
+        self.commands.foot_position.ranges = mdp.UniformPosition3dCommandCfg.Ranges(
+            pos_x=(0.0, 1.75), pos_y=(-0.15, 0.75), pos_z = (-0.6, 0.25))
+        
         # remove random pushing event
         # self.events.base_external_force_torque = None
         # self.events.push_robot = None

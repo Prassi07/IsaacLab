@@ -105,14 +105,14 @@ class SpotFlatHsPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class SpotPedipulatePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 100000
+    max_iterations = 200000
     save_interval = 200
     experiment_name = "spot_pedipulate"
     empirical_normalization = False
     store_code_state = False
-    resume = False
-    # load_checkpoint = "model_51000.pt"
-    # load_run = "2025-05-04_16-52-15"
+    # resume = True
+    # load_checkpoint = "model_190799.pt"
+    # load_run = "2025-05-06_19-43-25"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_hidden_dims=[512, 256, 128],

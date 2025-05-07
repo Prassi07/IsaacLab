@@ -92,8 +92,10 @@ def pedipulation_multileg_levels_size(
     
     is_right_leg_commanded_mask = (full_command_b[:, 3] == 1.0) 
     
+    # leg_command = torch.zeros_like(full_command_b[:, 2])
+    # is_right_leg_commanded_mask = (leg_command == 1.0) 
+    
     target_pos_w = quat_rotate(asset.data.root_quat_w[:, :4], target_pos_b) + asset.data.root_pos_w[:, :3]
-
 
     left_leg_idx = asset.find_bodies(["fl_foot"])[0]
     left_foot_pos_w = asset.data.body_pos_w[:, left_leg_idx, :].squeeze()
