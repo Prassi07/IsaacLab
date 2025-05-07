@@ -360,6 +360,10 @@ class SpotPedipulationTaskCfg(PedipulationEnvCfg):
             debug_vis=True,
         )
 
+        # terrain
+        if self.scene.terrain.terrain_generator is not None:
+            self.scene.terrain.terrain_generator.curriculum = False
+        
         # switch robot to Spot-d
         self.scene.robot = SPOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
