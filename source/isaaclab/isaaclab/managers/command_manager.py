@@ -58,6 +58,8 @@ class CommandTerm(ManagerTermBase):
         self._debug_vis_handle = None
         # set initial state of debug visualization
         self.set_debug_vis(self.cfg.debug_vis)
+        
+        self.reset_count = 0
 
     def __del__(self):
         """Unsubscribe from the callbacks."""
@@ -146,6 +148,8 @@ class CommandTerm(ManagerTermBase):
         # resample the command
         self._resample(env_ids)
 
+        self.reset_count += 1
+        
         return extras
 
     def compute(self, dt: float):

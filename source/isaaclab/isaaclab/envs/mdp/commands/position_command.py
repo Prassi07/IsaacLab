@@ -73,6 +73,8 @@ class UniformPosition3dCommand(CommandTerm):
         
         self.min_z_offset_from_terrain = 0.1
         
+        self.last_update_reset_counter = self.reset_count
+        
     def __str__(self) -> str:
         msg = "PositionCommand:\n"
         msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
@@ -163,13 +165,15 @@ class UniformPosition3dCommand(CommandTerm):
             # Ensure min is still less than or equal to max after clipping
             return (min(new_min, new_max), max(new_min, new_max))
 
-        # Update pos_x range
-        self.cfg.ranges.pos_x = _update_single_range(self.cfg.ranges.pos_x, self.cfg.max_ranges.pos_x, curriculum_factor, self.device)
-        # Update pos_y range
-        self.cfg.ranges.pos_y = _update_single_range(self.cfg.ranges.pos_y, self.cfg.max_ranges.pos_y, curriculum_factor, self.device)
-        # Update pos_z range
-        self.cfg.ranges.pos_z = _update_single_range(self.cfg.ranges.pos_z, self.cfg.max_ranges.pos_z, curriculum_factor, self.device)
-        
+        if((self.reset_count - self.last_update_reset_counter) > 50):
+            # Update pos_x range
+            self.cfg.ranges.pos_x = _update_single_range(self.cfg.ranges.pos_x, self.cfg.max_ranges.pos_x, curriculum_factor, self.device)
+            # Update pos_y range
+            self.cfg.ranges.pos_y = _update_single_range(self.cfg.ranges.pos_y, self.cfg.max_ranges.pos_y, curriculum_factor, self.device)
+            # Update pos_z range
+            self.cfg.ranges.pos_z = _update_single_range(self.cfg.ranges.pos_z, self.cfg.max_ranges.pos_z, curriculum_factor, self.device)
+            
+            self.last_update_reset_counter =  self.reset_count
         
     def _update_command(self):
         """Re-target the position command to the current root state."""
