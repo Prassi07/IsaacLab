@@ -66,7 +66,7 @@ class SpotCommandsPedipulateCfg:
         ranges=mdp.UniformPosition3dCommandCfg.Ranges(
             pos_x=(0.25, 0.75), pos_y=(0, 0.25), pos_z = (-0.5, 0.0)), 
         max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
-            pos_x=(0.0, 1.75), pos_y=(-0.15, 0.75), pos_z = (-0.6, 0.25)),
+            pos_x=(0.0, 1.75), pos_y=(-0.15, 0.75), pos_z = (-0.65, 0.25)),
         # ranges=mdp.UniformPosition3dCommandCfg.Ranges(
         #     pos_x=(0.25, 1.25), pos_y=(0, 0.75), pos_z = (0, 0.75)),
         # max_ranges=mdp.UniformPosition3dCommandCfg.Ranges(
