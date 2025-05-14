@@ -97,6 +97,9 @@ class UniformPosition3dCommand(CommandTerm):
 
     def _update_metrics(self):
         
+        max_command_time = self.cfg.resampling_time_range[1]
+        max_command_step = max_command_time / self._env.step_dt
+        
         # World position of the command target
         target_pos_w = self.pos_command_w
 
@@ -107,19 +110,20 @@ class UniformPosition3dCommand(CommandTerm):
         left_leg_idx = self.robot.find_bodies([self.left_leg_name])[0]
         left_foot_pos_w = self.robot.data.body_pos_w[:, left_leg_idx, :].squeeze()
         error_left = torch.norm(target_pos_w - left_foot_pos_w, dim=-1)
-        self.metrics["error_pos_3d_left"] = error_left
+        self.metrics["error_pos_3d_left"] += error_left / max_command_step
         
         # Calculate error for the right leg
         right_leg_idx = self.robot.find_bodies([self.right_leg_name])[0]
         right_foot_pos_w = self.robot.data.body_pos_w[:, right_leg_idx, :].squeeze()
         error_right = torch.norm(target_pos_w - right_foot_pos_w, dim=-1)
-        self.metrics["error_pos_3d_right"] = error_right
+        self.metrics["error_pos_3d_right"] += error_right / max_command_step
         
         # Calculate error for the commanded leg
         # self.leg_switch_command is (num_envs, 1): 0 for left, 1 for right.
         # Squeeze to (num_envs,) for torch.where condition.
         is_left_command_mask = (self.leg_switch_command.squeeze(dim=-1) == 0)
-        self.metrics["error_pos_3d_commanded_leg"] = torch.where(is_left_command_mask, error_left, error_right)
+        common_error = torch.where(is_left_command_mask, error_left, error_right)
+        self.metrics["error_pos_3d_commanded_leg"] += common_error / max_command_step
         
         
 
