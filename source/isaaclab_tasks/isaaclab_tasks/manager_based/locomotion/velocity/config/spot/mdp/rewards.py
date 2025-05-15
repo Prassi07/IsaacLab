@@ -117,6 +117,36 @@ def standing_reward(
 
     return reward
 
+def standing_reward_xy(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, velocity_threshold: float = 0.25
+) -> torch.Tensor:
+    """Penalize for not standing still when commanded to do so.
+
+    This reward is 1.0 if the commanded XY-velocity is below the `velocity_threshold`
+    but the actual XY-velocity is not, and 0.0 otherwise.
+    """
+    # Extract the asset
+    asset: RigidObject = env.scene[asset_cfg.name]
+
+    # Get commanded linear velocity (x, y)
+    target_vel_xy = env.command_manager.get_command("base_velocity")[:, :2]
+    # Get current linear velocity (x, y) in base frame
+    current_vel_xy = asset.data.root_lin_vel_b[:, :2]
+
+    # Calculate the magnitude (speed) of commanded and current velocities
+    target_speed = torch.linalg.norm(target_vel_xy, dim=1)
+    current_speed = torch.linalg.norm(current_vel_xy, dim=1)
+
+    # Check if the command is to stand still
+    is_command_zero = (target_speed < velocity_threshold)
+    # Check if the robot is actually standing still
+    is_actually_standing = (current_speed < velocity_threshold)
+
+    # Penalize/ if commanded to stand but not actually standing
+    condition = is_command_zero & is_actually_standing
+    reward = condition.float()
+
+    return reward
 
 class GaitReward(ManagerTermBase):
     """Gait enforcing reward term for quadrupeds.

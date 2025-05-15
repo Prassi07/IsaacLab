@@ -25,6 +25,7 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.spot.flat_env_cfg i
 # Pre-defined configs
 ##
 from isaaclab_assets.robots.spot import SPOT_CFG  # isort: skip
+from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG, ROUGH_TERRAINS_CFG_3
 
 COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
     size=(8.0, 8.0),
@@ -150,12 +151,29 @@ class SpotEventRoughCfg:
         },
     )
 
+    # reset_base = EventTerm(
+    #     func=mdp.reset_root_state_uniform,
+    #     mode="reset",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot"),
+    #         "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+    #         "velocity_range": {
+    #             "x": (-1.5, 1.5),
+    #             "y": (-1.0, 1.0),
+    #             "z": (-0.5, 0.5),
+    #             "roll": (-0.7, 0.7),
+    #             "pitch": (-0.7, 0.7),
+    #             "yaw": (-1.0, 1.0),
+    #         },
+    #     },
+    # )
+    
     reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
+        func=mdp.reset_root_state_from_terrain,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+            "pose_range": {"yaw": (-3.14, 3.14)},
             "velocity_range": {
                 "x": (-1.5, 1.5),
                 "y": (-1.0, 1.0),
@@ -223,12 +241,11 @@ class SpotRewardsRoughCfg:
         },
     )
     standing_reward =RewardTermCfg(
-        weight = 2.5,
-        func = spot_mdp.standing_reward,
+        weight = 10.0,
+        func = spot_mdp.standing_reward_xy,
         params = {
             "asset_cfg": SceneEntityCfg("robot"),
-            "std": 0.1,
-            "velocity_threshold": 0.25,
+            "velocity_threshold": 0.1,
         },        
     )
     gait = RewardTermCfg(
@@ -356,7 +373,27 @@ class SpotRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             self.scene.height_scanner.update_period = self.decimation * self.sim.dt
         if self.scene.contact_forces is not None:
             self.scene.contact_forces.update_period = self.sim.dt
-            
+        
+        self.scene.terrain = TerrainImporterCfg(
+            prim_path="/World/ground",
+            terrain_type="generator",
+            terrain_generator=ROUGH_TERRAINS_CFG_3,
+            max_init_terrain_level=ROUGH_TERRAINS_CFG_3.num_rows - 1,
+            collision_group=-1,
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply",
+                restitution_combine_mode="multiply",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+            ),
+            visual_material=sim_utils.MdlFileCfg(
+                mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+                project_uvw=True,
+                texture_scale=(0.25, 0.25),
+            ),
+            debug_vis=True,
+        )
+        
         # terrain
         if getattr(self.curriculum, "terrain_levels", None) is not None:
             if self.scene.terrain.terrain_generator is not None:
