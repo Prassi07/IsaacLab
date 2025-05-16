@@ -173,7 +173,7 @@ ROUGH_TERRAINS_CFG_3 = TerrainGeneratorCfg(
             flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
         "boxes": terrain_gen.MeshRandomGridTerrainCfg(
-            proportion=0.1, grid_width=0.45, grid_height_range=(-0.1, 0.1), platform_width=0.15, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+            proportion=0.1, grid_width=0.45, grid_height_range=(0.05, 0.25), platform_width=0.15, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
         "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
             proportion=0.1, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
