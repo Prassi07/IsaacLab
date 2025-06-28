@@ -179,10 +179,10 @@ ROUGH_TERRAINS_CFG_3 = TerrainGeneratorCfg(
             proportion=0.1, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
         "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.7), platform_width=0.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+            proportion=0.1, slope_range=(0.0, 0.5), platform_width=0.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
         "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.7), platform_width=.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+            proportion=0.1, slope_range=(0.0, 0.5), platform_width=.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
     },
 )
