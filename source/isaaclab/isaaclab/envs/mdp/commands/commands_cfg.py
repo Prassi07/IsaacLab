@@ -262,6 +262,7 @@ class UniformPosition3dCommandCfg(CommandTermCfg):
     
     right_leg_name: str = MISSING
     
+    standing_ratio: float = MISSING
     @configclass
     class Ranges:
         """Uniform distribution ranges for the position commands."""

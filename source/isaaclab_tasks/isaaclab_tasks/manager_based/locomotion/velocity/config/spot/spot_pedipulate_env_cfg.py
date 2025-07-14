@@ -61,7 +61,8 @@ class SpotCommandsPedipulateCfg:
         asset_name="robot",
         left_leg_name="fl_foot",
         right_leg_name="fr_foot",
-        resampling_time_range=(9.0, 18.0), 
+        resampling_time_range=(9.0, 18.0),
+        standing_ratio = 0.25, 
         debug_vis=True,
         ranges=mdp.UniformPosition3dCommandCfg.Ranges(
             pos_x=(0.25, 0.75), pos_y=(0, 0.25), pos_z = (-0.5, 0.0)), 
@@ -231,6 +232,17 @@ class SpotRewardsPedipulateCfg:
                                     "right_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fr_foot"),
                                     "std": 0.8}
     ) # Weight From Paper
+    
+    standing_reward = RewardTermCfg(spot_mdp.stable_standing_reward,
+                                    weight = 10.0,
+                                    params={
+                                        "robot_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+                                        "contact_sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+                                        "force_threshold" : 1.0,
+                                        "velocity_std" : 1.0,
+                                        "orientation_std" : 1.0,
+                                    }
+    )
 
     # -- penalties
     
@@ -244,6 +256,7 @@ class SpotRewardsPedipulateCfg:
         weight=-0.05,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
+    
     joint_vel = RewardTermCfg(
         func=spot_mdp.joint_velocity_square_penalty,
         weight=-0.04,

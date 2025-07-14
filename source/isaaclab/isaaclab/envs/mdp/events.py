@@ -1149,7 +1149,7 @@ def apply_external_force_torque_left_leg(
 
     env.observation_manager.group_obs_concatenate
     command_applied = env.command_manager.get_command("foot_position") 
-    left_leg_envs_mask = (command_applied[env_ids, 3] == 0)
+    left_leg_envs_mask = (command_applied[env_ids, 3] == 1)
     
     left_leg_envs = env_ids[left_leg_envs_mask]
 
@@ -1186,7 +1186,7 @@ def apply_external_force_torque_right_leg(
     num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else asset.num_bodies
 
     command_applied = env.command_manager.get_command("foot_position") 
-    right_leg_envs_mask = (command_applied[env_ids, 3] == 1)
+    right_leg_envs_mask = (command_applied[env_ids, 4] == 1)
     
     right_leg_envs = env_ids[right_leg_envs_mask]
 

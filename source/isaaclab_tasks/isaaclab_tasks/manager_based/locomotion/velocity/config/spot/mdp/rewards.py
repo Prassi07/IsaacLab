@@ -11,7 +11,7 @@ specify the reward function and its parameters.
 
 from __future__ import annotations
 
-from isaaclab.utils.math import quat_rotate_inverse
+from isaaclab.utils.math import quat_rotate_inverse, euler_xyz_from_quat
 import torch
 from typing import TYPE_CHECKING
 
@@ -400,6 +400,56 @@ def pedipulation_goal_reward(
     return torch.exp(-pos_error / std)
 
 
+# def multileg_pedipulation_reward(
+#     env: ManagerBasedRLEnv,
+#     asset_cfg: SceneEntityCfg,
+#     left_leg_asset_cfg: SceneEntityCfg,
+#     right_leg_asset_cfg: SceneEntityCfg,
+#     std: float,
+# ) -> torch.Tensor:
+#     """Reward the commanded leg for reaching its 3D position goal in the base frame.
+
+#     The command includes which leg to target (0 for left, 1 for right).
+#     The reward is calculated based on the distance error of the commanded leg to its target.
+#     """
+    
+#     # Extract assets
+#     robot_asset: Articulation = env.scene[asset_cfg.name]
+#     # Note: left_leg_asset_cfg and right_leg_asset_cfg are used to get body_ids for the respective feet.
+#     # The actual position data comes from robot_asset.data.body_pos_w using these IDs.
+
+#     # Get the 4D command: (local_x, local_y, local_z, leg_switch)
+#     # leg_switch is 0 for left, 1 for right.
+#     full_command = env.command_manager.get_command("foot_position")
+#     target_pos_b = full_command[:, :3]  # Target position in base frame
+    
+#     # leg_command = torch.zeros_like(full_command[:, 2])
+#     # is_right_leg_commanded_mask = (leg_command == 1.0) 
+    
+#     # leg_switch_command will be (num_envs,). True if right leg is commanded.
+#     is_right_leg_commanded_mask = (full_command[:, 3] == 1.0)
+
+#     # Get current world positions of the feet
+#     left_foot_pos_w = robot_asset.data.body_pos_w[:, left_leg_asset_cfg.body_ids, :].squeeze()
+#     right_foot_pos_w = robot_asset.data.body_pos_w[:, right_leg_asset_cfg.body_ids, :].squeeze()
+
+#     # Get robot's root pose for transformation
+#     robot_pos_w = robot_asset.data.root_pos_w
+#     robot_quat_w = robot_asset.data.root_quat_w
+
+#     # Transform foot positions from world to robot's base frame
+#     left_foot_pos_b = quat_rotate_inverse(robot_quat_w, left_foot_pos_w - robot_pos_w)
+#     right_foot_pos_b = quat_rotate_inverse(robot_quat_w, right_foot_pos_w - robot_pos_w)
+
+#     # Calculate position error for both legs
+#     error_left_leg = torch.linalg.norm((target_pos_b - left_foot_pos_b), dim=1)
+#     error_right_leg = torch.linalg.norm((target_pos_b - right_foot_pos_b), dim=1)
+
+#     # Select the error corresponding to the commanded leg
+#     commanded_leg_error = torch.where(is_right_leg_commanded_mask, error_right_leg, error_left_leg)
+
+#     return torch.exp(-commanded_leg_error / std)
+
 def multileg_pedipulation_reward(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg,
@@ -409,25 +459,28 @@ def multileg_pedipulation_reward(
 ) -> torch.Tensor:
     """Reward the commanded leg for reaching its 3D position goal in the base frame.
 
-    The command includes which leg to target (0 for left, 1 for right).
-    The reward is calculated based on the distance error of the commanded leg to its target.
+    The command is 5D: (x, y, z, left_leg_cmd, right_leg_cmd).
+    - [1, 0] for left leg command.
+    - [0, 1] for right leg command.
+    - [0, 0] for standing command.
+
+    For leg swing commands, the reward is based on the distance error of the commanded leg.
+    For standing commands, the reward is zero.
     """
     
     # Extract assets
     robot_asset: Articulation = env.scene[asset_cfg.name]
-    # Note: left_leg_asset_cfg and right_leg_asset_cfg are used to get body_ids for the respective feet.
-    # The actual position data comes from robot_asset.data.body_pos_w using these IDs.
 
-    # Get the 4D command: (local_x, local_y, local_z, leg_switch)
-    # leg_switch is 0 for left, 1 for right.
+    # Get the 5D command: (local_x, local_y, local_z, left_cmd, right_cmd)
     full_command = env.command_manager.get_command("foot_position")
     target_pos_b = full_command[:, :3]  # Target position in base frame
-    
-    # leg_command = torch.zeros_like(full_command[:, 2])
-    # is_right_leg_commanded_mask = (leg_command == 1.0) 
-    
-    # leg_switch_command will be (num_envs,). True if right leg is commanded.
-    is_right_leg_commanded_mask = (full_command[:, 3] == 1.0)
+    leg_commands = full_command[:, 3:5] # Leg command bits
+
+    # Create masks based on the leg commands
+    is_left_leg_commanded_mask = (leg_commands[:, 0] == 1.0)
+    is_right_leg_commanded_mask = (leg_commands[:, 1] == 1.0)
+    # Standing command is when both leg commands are 0
+    is_standing_command_mask = ~is_left_leg_commanded_mask & ~is_right_leg_commanded_mask
 
     # Get current world positions of the feet
     left_foot_pos_w = robot_asset.data.body_pos_w[:, left_leg_asset_cfg.body_ids, :].squeeze()
@@ -445,7 +498,99 @@ def multileg_pedipulation_reward(
     error_left_leg = torch.linalg.norm((target_pos_b - left_foot_pos_b), dim=1)
     error_right_leg = torch.linalg.norm((target_pos_b - right_foot_pos_b), dim=1)
 
-    # Select the error corresponding to the commanded leg
-    commanded_leg_error = torch.where(is_right_leg_commanded_mask, error_right_leg, error_left_leg)
+    # Select the error corresponding to the commanded leg.
+    # Initialize error to zero. It will remain zero for standing commands.
+    commanded_leg_error = torch.zeros_like(error_left_leg)
+    commanded_leg_error = torch.where(is_left_leg_commanded_mask, error_left_leg, commanded_leg_error)
+    commanded_leg_error = torch.where(is_right_leg_commanded_mask, error_right_leg, commanded_leg_error)
 
-    return torch.exp(-commanded_leg_error / std)
+    # Calculate reward - it will be 1.0 for standing commands since error is 0.
+    reward = torch.exp(-commanded_leg_error / std)
+
+    # Zero out the reward for standing commands as requested.
+    reward = torch.where(is_standing_command_mask, 0.0, reward)
+
+    return reward
+
+def stable_standing_reward(
+    env: ManagerBasedRLEnv,
+    robot_cfg: SceneEntityCfg,
+    contact_sensor_cfg: SceneEntityCfg,
+    force_threshold: float,
+    velocity_std: float,
+    orientation_std: float,
+) -> torch.Tensor:
+    """
+    Rewards the robot for standing stably on four feet when a standing command is issued.
+
+    This reward is only active when the command is [0, 0] (standing). It checks for:
+    1. Contact on all four feet, verified by checking contact forces.
+    2. Minimal linear and angular velocity of the base to ensure stillness.
+    3. An upright body orientation (minimal roll and pitch).
+    """
+    # --- 1. Extract assets and check for standing command ---
+
+    # Extract robot and contact sensor from the environment scene
+    robot: Articulation = env.scene[robot_cfg.name]
+    contact_sensor: ContactSensor = env.scene[contact_sensor_cfg.name]
+
+    # Get the 5D command from the command manager
+    # Command format: (x, y, z, left_cmd, right_cmd)
+    full_command = env.command_manager.get_command("foot_position")
+    # A standing command is active when both leg command bits are 0
+    is_standing_command_mask = (full_command[:, 3] == 0.0) & (full_command[:, 4] == 0.0)
+
+    # --- 2. Check for four-leg contact ---
+
+    # Get contact forces on all bodies tracked by the sensor
+    net_contact_forces = contact_sensor.data.net_forces_w
+    # Get the vertical component (Z-axis) of the forces on the four feet
+    feet_forces_z = net_contact_forces[:, contact_sensor_cfg.body_ids, 2]
+    
+    # Check if each foot has a contact force greater than the threshold
+    # The result is a boolean tensor of shape (num_envs, 4)
+    feet_in_contact = feet_forces_z > force_threshold
+    # Check if all four feet are in contact for each environment
+    # The result is a boolean tensor of shape (num_envs,)
+    all_four_feet_in_contact = torch.all(feet_in_contact, dim=1)
+
+    # --- 3. Reward for stability (low velocity and upright orientation) ---
+
+    # Penalize linear and angular velocity of the base to encourage stillness
+    base_lin_vel = robot.data.root_lin_vel_b
+    base_ang_vel = robot.data.root_ang_vel_b
+    velocity_error = torch.norm(base_lin_vel, dim=1) + 0.5 * torch.norm(base_ang_vel, dim=1)
+    velocity_reward = torch.exp(-velocity_error / velocity_std)
+
+    # Penalize roll to encourage an upright posture (pitch can be non-zero on stairs)
+    # euler_xyz_from_quat returns (roll, pitch, yaw)
+    roll, pitch, _ = euler_xyz_from_quat(robot.data.root_quat_w)
+    orientation_error = torch.square(roll)
+    orientation_reward = torch.exp(-orientation_error / orientation_std)
+
+    # --- 4. Combine rewards and apply conditions ---
+
+    # The final reward is a product of the stability components
+    standing_reward = velocity_reward * orientation_reward
+
+    # The reward is only applied if the command is "stand" AND all four feet are on the ground.
+    # Otherwise, the reward is zero.
+    final_reward = torch.where(is_standing_command_mask & all_four_feet_in_contact, standing_reward, 0.0)
+
+    return final_reward
+
+def foot_slip_penalty(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, sensor_cfg: SceneEntityCfg, threshold: float
+) -> torch.Tensor:
+    """Penalize foot planar (xy) slip when in contact with the ground"""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+
+    # check if contact force is above threshold
+    net_contact_forces = contact_sensor.data.net_forces_w_history
+    is_contact = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
+    foot_planar_velocity = torch.linalg.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=2)
+
+    reward = is_contact * foot_planar_velocity
+    return torch.sum(reward, dim=1)

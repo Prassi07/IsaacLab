@@ -79,40 +79,99 @@ def pedipulation_levels_size(
     return mean_error
     
 
+# def pedipulation_multileg_levels_size(
+#     env: ManagerBasedRLEnv, env_ids: Sequence[int], asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+# ) -> torch.Tensor:
+#     """
+#      Curriculum for Pedipulation, as more success, range of sampled commands goes up 
+#     """
+#     asset: Articulation = env.scene[asset_cfg.name]
+    
+#     full_command_b = env.command_manager.get_command("foot_position")
+#     target_pos_b = full_command_b[:, :3] # Target position in base frame
+    
+#     is_right_leg_commanded_mask = (full_command_b[:, 3] == 1.0) 
+    
+#     # leg_command = torch.zeros_like(full_command_b[:, 2])
+#     # is_right_leg_commanded_mask = (leg_command == 1.0) 
+    
+#     target_pos_w = quat_rotate(asset.data.root_quat_w[:, :4], target_pos_b) + asset.data.root_pos_w[:, :3]
+
+#     left_leg_idx = asset.find_bodies(["fl_foot"])[0]
+#     left_foot_pos_w = asset.data.body_pos_w[:, left_leg_idx, :].squeeze()
+    
+#     right_leg_idx = asset.find_bodies(["fr_foot"])[0]
+#     right_foot_pos_w = asset.data.body_pos_w[:, right_leg_idx, :].squeeze()
+
+#     error_left_leg_w = torch.linalg.norm(left_foot_pos_w - target_pos_w, dim=1)
+#     error_right_leg_w = torch.linalg.norm(right_foot_pos_w - target_pos_w, dim=1)
+    
+#     all_errors = torch.where(is_right_leg_commanded_mask, error_right_leg_w, error_left_leg_w)
+    
+#     mean_error = torch.mean(all_errors)
+    
+#     if(mean_error < 0.06):
+#         command_term = env.command_manager.get_term("foot_position")
+#         command_term.update_curriculums(curriculum_factor = 0.2)
+    
+#     return mean_error
+
+
 def pedipulation_multileg_levels_size(
     env: ManagerBasedRLEnv, env_ids: Sequence[int], asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
     """
-     Curriculum for Pedipulation, as more success, range of sampled commands goes up 
+    Curriculum for Pedipulation. As the success rate of leg placement increases,
+    the range of the sampled command goals is expanded.
+
+    This function checks the error for commanded leg placements (left or right swings)
+    and ignores standing commands when calculating the mean error for the curriculum.
     """
     asset: Articulation = env.scene[asset_cfg.name]
-    
-    full_command_b = env.command_manager.get_command("foot_position")
-    target_pos_b = full_command_b[:, :3] # Target position in base frame
-    
-    is_right_leg_commanded_mask = (full_command_b[:, 3] == 1.0) 
-    
-    # leg_command = torch.zeros_like(full_command_b[:, 2])
-    # is_right_leg_commanded_mask = (leg_command == 1.0) 
-    
-    target_pos_w = quat_rotate(asset.data.root_quat_w[:, :4], target_pos_b) + asset.data.root_pos_w[:, :3]
 
+    # Get the 5D command: (x, y, z, left_cmd, right_cmd)
+    full_command_b = env.command_manager.get_command("foot_position")
+    target_pos_b = full_command_b[:, :3]  # Target position in base frame
+    leg_commands = full_command_b[:, 3:5]
+
+    # Create masks for left, right, and general stepping commands
+    is_left_leg_commanded_mask = (leg_commands[:, 0] == 1.0)
+    is_right_leg_commanded_mask = (leg_commands[:, 1] == 1.0)
+    is_stepping_command_mask = is_left_leg_commanded_mask | is_right_leg_commanded_mask
+
+    # If no stepping commands are present in the batch, no curriculum update can be evaluated.
+    if not torch.any(is_stepping_command_mask):
+        # Return a high error value to indicate no progress can be measured.
+        return torch.tensor(float('inf'), device=env.device)
+
+    # Transform target position from base to world frame for error calculation
+    target_pos_w = quat_rotate(asset.data.root_quat_w, target_pos_b) + asset.data.root_pos_w
+
+    # Get foot positions in world frame
+    # Note: The body names like "fl_foot" and "fr_foot" are examples.
+    # These should match the actual names in your robot's articulation configuration.
     left_leg_idx = asset.find_bodies(["fl_foot"])[0]
     left_foot_pos_w = asset.data.body_pos_w[:, left_leg_idx, :].squeeze()
-    
+
     right_leg_idx = asset.find_bodies(["fr_foot"])[0]
     right_foot_pos_w = asset.data.body_pos_w[:, right_leg_idx, :].squeeze()
 
+    # Calculate position error for both legs in the world frame
     error_left_leg_w = torch.linalg.norm(left_foot_pos_w - target_pos_w, dim=1)
     error_right_leg_w = torch.linalg.norm(right_foot_pos_w - target_pos_w, dim=1)
-    
-    all_errors = torch.where(is_right_leg_commanded_mask, error_right_leg_w, error_left_leg_w)
-    
-    mean_error = torch.mean(all_errors)
-    
-    if(mean_error < 0.06):
+
+    # Select the error corresponding to the commanded leg.
+    # Initialize with zeros, then fill in errors for left and right commands.
+    commanded_leg_error = torch.zeros_like(error_left_leg_w)
+    commanded_leg_error = torch.where(is_left_leg_commanded_mask, error_left_leg_w, commanded_leg_error)
+    commanded_leg_error = torch.where(is_right_leg_commanded_mask, error_right_leg_w, commanded_leg_error)
+
+    # Calculate the mean error, considering only the environments with stepping commands.
+    mean_error = torch.mean(commanded_leg_error[is_stepping_command_mask])
+
+    # If the mean error is below the threshold, update the command curriculum ranges.
+    if mean_error < 0.06:
         command_term = env.command_manager.get_term("foot_position")
-        command_term.update_curriculums(curriculum_factor = 0.2)
-    
+        command_term.update_curriculums(curriculum_factor=0.2)
+
     return mean_error
-    

@@ -29,9 +29,13 @@ if TYPE_CHECKING:
 
 
 class UniformPosition3dCommand(CommandTerm):
-    """Command generator that generates postion commands containing a 3-D position.
+    """Command generator that generates position commands containing a 3-D position and leg choice.
 
     The command generator samples uniform 3D positions around the environment origin.
+    The leg choice is represented by 2 bits:
+    - [1, 0]: Use left leg.
+    - [0, 1]: Use right leg.
+    - [0, 0]: Standing command.
     """
 
     cfg: UniformPosition3dCommandCfg
@@ -53,16 +57,21 @@ class UniformPosition3dCommand(CommandTerm):
         self.left_leg_name = cfg.left_leg_name
         self.right_leg_name = cfg.right_leg_name
         
-        # crete buffers to store the command
-        # -- commands: (x, y, z, heading)
+        self.standing_ratio = cfg.standing_ratio
+        # create buffers to store the command
+        # -- world frame position command
         self.pos_command_w = torch.zeros(self.num_envs, 3, device=self.device)
+        # -- base frame position command (x,y,z)
         self.pos_command_b = torch.zeros_like(self.pos_command_w)
         
-        self.pos_leg_command_b = torch.zeros(self.num_envs, 4, device=self.device)
+        # -- final command: (x, y, z, leg_choice_left, leg_choice_right)
+        self.pos_leg_command_b = torch.zeros(self.num_envs, 5, device=self.device)
         
-        self.leg_switch_command = torch.zeros(self.num_envs, 1, device=self.device)
+        # -- leg switch command: [1,0] for left, [0,1] for right, [0,0] for standing
+        self.leg_switch_command = torch.zeros(self.num_envs, 2, device=self.device)
         
-        self.zero_orientations = torch.zeros(self.num_envs, 1)
+        # -- buffer for zero orientation for visualizers
+        self.zero_orientations = torch.zeros(self.num_envs, 1, device=self.device)
         # -- metrics
         self.metrics["error_pos_3d_left"] = torch.ones(self.num_envs, device=self.device)
         self.metrics["error_pos_3d_right"] = torch.ones(self.num_envs, device=self.device)
@@ -88,7 +97,7 @@ class UniformPosition3dCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:
-        """The desired 3D position (x,y,z) and leg choice (0 for left, 1 for right) in base frame. Shape is (num_envs, 4)."""
+        """The desired 3D position (x,y,z) and 2-bit leg choice in base frame. Shape is (num_envs, 5)."""
         return self.pos_leg_command_b
 
     """
@@ -104,9 +113,6 @@ class UniformPosition3dCommand(CommandTerm):
         target_pos_w = self.pos_command_w
 
         # Calculate error for the left leg
-        # self.robot.find_bodies([self.left_leg_name])[0] returns a list like [[index_for_left_foot]]
-        # So, self.robot.find_bodies([self.left_leg_name])[0][0] gives [index_for_left_foot]
-        
         left_leg_idx = self.robot.find_bodies([self.left_leg_name])[0]
         left_foot_pos_w = self.robot.data.body_pos_w[:, left_leg_idx, :].squeeze()
         error_left = torch.norm(target_pos_w - left_foot_pos_w, dim=-1)
@@ -119,11 +125,15 @@ class UniformPosition3dCommand(CommandTerm):
         self.metrics["error_pos_3d_right"] += error_right / max_command_step
         
         # Calculate error for the commanded leg
-        # self.leg_switch_command is (num_envs, 1): 0 for left, 1 for right.
-        # Squeeze to (num_envs,) for torch.where condition.
-        is_left_command_mask = (self.leg_switch_command.squeeze(dim=-1) == 0)
-        common_error = torch.where(is_left_command_mask, error_left, error_right)
-        self.metrics["error_pos_3d_commanded_leg"] += common_error / max_command_step
+        # self.leg_switch_command is (num_envs, 2): [1,0] for left, [0,1] for right, [0,0] for standing
+        is_left_command_mask = self.leg_switch_command[:, 0] == 1.0
+        is_right_command_mask = self.leg_switch_command[:, 1] == 1.0
+        
+        # Calculate error for the commanded leg, set to 0 for standing commands.
+        commanded_error = torch.zeros_like(error_left)
+        commanded_error = torch.where(is_left_command_mask, error_left, commanded_error)
+        commanded_error = torch.where(is_right_command_mask, error_right, commanded_error)
+        self.metrics["error_pos_3d_commanded_leg"] = commanded_error
         
         
 
@@ -132,23 +142,36 @@ class UniformPosition3dCommand(CommandTerm):
         # tensor `r_for_sampling` for random sampling, shape: (len(env_ids),)
         r_for_sampling = torch.empty(len(env_ids), device=self.device)
         
-        # self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
-        # self.pos_command_w[env_ids, 0] += r_for_sampling.uniform_(*self.cfg.ranges.pos_x)
-        # self.pos_command_w[env_ids, 1] += r_for_sampling.uniform_(*self.cfg.ranges.pos_y)
-        # self.pos_command_w[env_ids, 2] += r_for_sampling.uniform_(*self.cfg.ranges.pos_z)
+        # Decide between standing and stepping based on standing_ratio
+        is_standing_mask = r_for_sampling.uniform_(0, 1) < self.cfg.standing_ratio
+
+        # For stepping commands, decide between left and right leg
+        is_left_leg_swing_mask = r_for_sampling.uniform_(0, 1) < 0.5
+
+        # Set the 2-bit command based on the decisions
+        # Default to standing [0, 0]
+        self.leg_switch_command[env_ids] = 0.0
+        # Where not standing and left swing, set to [1, 0]
+        self.leg_switch_command[env_ids, 0] = torch.where(~is_standing_mask & is_left_leg_swing_mask, 1.0, 0.0)
+        # Where not standing and right swing, set to [0, 1]
+        self.leg_switch_command[env_ids, 1] = torch.where(~is_standing_mask & ~is_left_leg_swing_mask, 1.0, 0.0)
         
-        # Determine leg choice
-        is_left_leg_mask = r_for_sampling.uniform_(0, 1) < 0.5  # LEFT LEG will be True
-        self.leg_switch_command[env_ids, 0] = (~is_left_leg_mask).float()   # LEFT LEG will be 0, Right will be 1
-        
+        # Sample x and z position commands in the base frame
         self.pos_command_b[env_ids, 0] = r_for_sampling.uniform_(*self.cfg.ranges.pos_x)
         self.pos_command_b[env_ids, 2] = r_for_sampling.uniform_(*self.cfg.ranges.pos_z)
         
-        # Sample y-offsets and  Apply negation for the right leg if it's chosen
+        # Sample y-offsets and apply based on the command type
         y_offsets_candidate = r_for_sampling.uniform_(*self.cfg.ranges.pos_y)
-        final_y_offsets = torch.where(is_left_leg_mask, y_offsets_candidate, -y_offsets_candidate) # Negative for right, as left leg is true
+        
+        # For standing, y-offset is 0. For left swing, it's positive. For right swing, it's negative.
+        final_y_offsets = torch.zeros_like(y_offsets_candidate)
+        final_y_offsets = torch.where(~is_standing_mask & is_left_leg_swing_mask, y_offsets_candidate, final_y_offsets)
+        final_y_offsets = torch.where(~is_standing_mask & ~is_left_leg_swing_mask, -y_offsets_candidate, final_y_offsets)
         self.pos_command_b[env_ids, 1] = final_y_offsets
         
+        # Zero out all position commands for standing environments
+        self.pos_command_b[env_ids] = torch.where(is_standing_mask.unsqueeze(-1), 0.0, self.pos_command_b[env_ids])
+
         # Update the world-frame command for ALL environments to be consistent with the current base-frame command
         self.pos_command_w[env_ids, :] = self.robot.data.root_pos_w[env_ids, :] + quat_rotate(self.robot.data.root_quat_w[env_ids, :], self.pos_command_b[env_ids, :])
         
@@ -214,11 +237,11 @@ class UniformPosition3dCommand(CommandTerm):
         Assembles the final agent command `self.pos_leg_command_b`.
         
         The 3D position part is derived from `self.pos_command_w` (world-frame target)
-        by transforming it back to the robot's base frame. The leg switch command is appended.
+        by transforming it back to the robot's base frame. The 2-bit leg switch command is appended.
         """
         target_vec = self.pos_command_w - self.robot.data.root_pos_w[:, :3]
         self.pos_leg_command_b[:, :3] = quat_rotate_inverse(self.robot.data.root_quat_w, target_vec)
-        self.pos_leg_command_b[:, 3] = self.leg_switch_command.squeeze()
+        self.pos_leg_command_b[:, 3:5] = self.leg_switch_command
         
 
     def _set_debug_vis_impl(self, debug_vis: bool):
@@ -238,12 +261,13 @@ class UniformPosition3dCommand(CommandTerm):
         else:
             if hasattr(self, "right_goal_position_visualizer"):
                 self.right_goal_position_visualizer.set_visibility(False)
+            
+            if hasattr(self, "left_goal_position_visualizer"):
+                self.left_goal_position_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
         
         # Default orientation for the markers (e.g., identity quaternion)
-        # self.zero_orientations is (num_envs, 1)
-        # quat_from_euler_xyz output is (num_envs, 1, 4), squeeze to (num_envs, 4)
         default_orientations_quat = quat_from_euler_xyz(
             self.zero_orientations, self.zero_orientations, self.zero_orientations
         ).squeeze(dim=1) # Squeeze only dim 1 to be safe if num_envs is 1
@@ -253,17 +277,20 @@ class UniformPosition3dCommand(CommandTerm):
         far_away_translations[:, 2] = -1000.0 
 
         # Determine which leg is commanded for each environment
-        # self.leg_switch_command is (num_envs, 1): 0 for left, 1 for right
-        is_left_command_mask = (self.leg_switch_command.squeeze(dim=-1) == 0)
+        # self.leg_switch_command is (num_envs, 2): [1,0] for left, [0,1] for right, [0,0] for standing
+        is_left_command_mask = self.leg_switch_command[:, 0] == 1.0
+        is_right_command_mask = self.leg_switch_command[:, 1] == 1.0
 
         # Set translations for left leg visualizer
+        # Show marker only if left leg is commanded
         left_viz_translations = torch.where(is_left_command_mask.unsqueeze(-1), self.pos_command_w, far_away_translations)
         self.left_goal_position_visualizer.visualize(
             translations=left_viz_translations, orientations=default_orientations_quat
         )
         
         # Set translations for right leg visualizer
-        right_viz_translations = torch.where(~is_left_command_mask.unsqueeze(-1), self.pos_command_w, far_away_translations)
+        # Show marker only if right leg is commanded
+        right_viz_translations = torch.where(is_right_command_mask.unsqueeze(-1), self.pos_command_w, far_away_translations)
         self.right_goal_position_visualizer.visualize(
             translations=right_viz_translations, orientations=default_orientations_quat
         )
