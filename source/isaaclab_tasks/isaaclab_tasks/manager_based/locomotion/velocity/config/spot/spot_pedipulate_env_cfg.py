@@ -227,23 +227,41 @@ class SpotRewardsPedipulateCfg:
     goal_reward = RewardTermCfg(spot_mdp.multileg_pedipulation_reward,
                                 weight=15.0,
                                 params={
-                                    "asset_cfg": SceneEntityCfg("robot"),
+                                    "robot_cfg": SceneEntityCfg("robot"),
                                     "left_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fl_foot"),
                                     "right_leg_asset_cfg" : SceneEntityCfg("robot", body_names="fr_foot"),
                                     "std": 0.8}
     ) # Weight From Paper
     
-    standing_reward = RewardTermCfg(spot_mdp.stable_standing_reward,
-                                    weight = 10.0,
+    # Standing Rewards when no pedipulation command
+    zero_vel_reward = RewardTermCfg(spot_mdp.zero_velocity_reward,
+                                    weight = 2.5,
                                     params={
-                                        "robot_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+                                        "robot_cfg": SceneEntityCfg("robot"),
                                         "contact_sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
                                         "force_threshold" : 1.0,
                                         "velocity_std" : 1.0,
-                                        "orientation_std" : 1.0,
                                     }
     )
-
+    
+    zero_orientation_reward = RewardTermCfg(spot_mdp.body_terrain_alignment_reward,
+                                    weight = 5.0,
+                                    params={
+                                        "robot_cfg": SceneEntityCfg("robot"),
+                                        "leg_asset_cfg":  SceneEntityCfg("robot", body_names=".*_foot"),
+                                        "contact_sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+                                        "force_threshold" : 1.0,
+                                    }
+    )
+    
+    zero_joint_pos_reward = RewardTermCfg(spot_mdp.default_joint_pos_reward,
+                                    weight = 2.5,
+                                    params={
+                                        "robot_cfg": SceneEntityCfg("robot"),
+                                        "joint_pos_std" : 0.5,
+                                    }
+    )
+    
     # -- penalties
     
     base_linear_z_velocity = RewardTermCfg(
