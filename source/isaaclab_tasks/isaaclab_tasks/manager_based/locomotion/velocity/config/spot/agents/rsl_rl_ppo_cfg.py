@@ -106,7 +106,7 @@ class SpotFlatHsPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 class SpotPedipulatePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 200000
-    save_interval = 200
+    save_interval = 2000
     experiment_name = "spot_pedipulate"
     empirical_normalization = False
     store_code_state = False

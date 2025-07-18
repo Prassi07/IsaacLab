@@ -235,7 +235,7 @@ class SpotRewardsPedipulateCfg:
     
     # Standing Rewards when no pedipulation command
     zero_vel_reward = RewardTermCfg(spot_mdp.zero_velocity_reward,
-                                    weight = 2.5,
+                                    weight = 5.0,
                                     params={
                                         "robot_cfg": SceneEntityCfg("robot"),
                                         "contact_sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
@@ -245,7 +245,7 @@ class SpotRewardsPedipulateCfg:
     )
     
     zero_orientation_reward = RewardTermCfg(spot_mdp.body_terrain_alignment_reward,
-                                    weight = 5.0,
+                                    weight = 10.0,
                                     params={
                                         "robot_cfg": SceneEntityCfg("robot"),
                                         "leg_asset_cfg":  SceneEntityCfg("robot", body_names=".*_foot"),
@@ -255,7 +255,7 @@ class SpotRewardsPedipulateCfg:
     )
     
     zero_joint_pos_reward = RewardTermCfg(spot_mdp.default_joint_pos_reward,
-                                    weight = 2.5,
+                                    weight = 5.0,
                                     params={
                                         "robot_cfg": SceneEntityCfg("robot"),
                                         "joint_pos_std" : 0.5,
