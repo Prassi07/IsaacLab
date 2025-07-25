@@ -334,7 +334,7 @@ class SpotCurriculumPedipulateCfg:
 class SpotPedipulationTaskCfg(PedipulationEnvCfg):
 
     # Basic settings'
-    scene: MySceneCfg = MySceneCfg(num_envs = 4096, env_spacing = 2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs = 4096, env_spacing = 8.0)
     observations: SpotObservationsPedipulateCfg = SpotObservationsPedipulateCfg()
     actions: SpotActionsPedipulateCfg = SpotActionsPedipulateCfg()
     commands: SpotCommandsPedipulateCfg = SpotCommandsPedipulateCfg()

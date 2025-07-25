@@ -54,8 +54,8 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
 
 FLAT_SAMPLING_CFG = FlatPatchSamplingCfg(
         num_patches=10,
-        patch_radius=0.5,
-        max_height_diff = 0.7,
+        patch_radius=0.6,
+        max_height_diff = 0.6,
 )
 
 FLAT_SAMPLING_CFG_2 = FlatPatchSamplingCfg(
@@ -67,7 +67,7 @@ FLAT_SAMPLING_CFG_2 = FlatPatchSamplingCfg(
 ROUGH_TERRAINS_CFG_2 = TerrainGeneratorCfg(
     size=(8.0, 8.0),
     border_width=20.0,
-    num_rows=10,
+    num_rows=15,
     num_cols=20,
     horizontal_scale=0.1,
     vertical_scale=0.005,
@@ -111,16 +111,20 @@ ROUGH_TERRAINS_CFG_2 = TerrainGeneratorCfg(
             flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
         ),
         "boxes": terrain_gen.MeshRandomGridTerrainCfg(
-            proportion=0.1, grid_width=0.45, grid_height_range=(0.05, 0.2), platform_width=0.15, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
+            proportion=0.05, grid_width=0.45, grid_height_range=(0.05, 0.2), platform_width=0.15, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
         ),
         "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
-            proportion=0.1, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
+            proportion=0.05, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
         ),
         "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.4), platform_width=0.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
+            proportion=0.05, slope_range=(0.0, 0.4), platform_width=0.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
         ),
         "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.4), platform_width=.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
+            proportion=0.05, slope_range=(0.0, 0.4), platform_width=.15, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
+        ),
+        "hf_discrete_terrain": terrain_gen.HfDiscreteObstaclesTerrainCfg(
+            proportion=0.1, platform_width=1.0, border_width=0.25, num_obstacles = 15, obstacle_width_range = (0.2, 0.8), 
+            obstacle_height_range = (-0.2, 0.6), flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG}
         ),
     },
 )

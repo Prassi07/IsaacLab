@@ -119,7 +119,7 @@ def pedipulation_levels_size(
 
 def pedipulation_multileg_levels_size(
     env: ManagerBasedRLEnv, env_ids: Sequence[int], asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-) -> torch.Tensor:
+) -> dict:
     """
     Curriculum for Pedipulation. As the success rate of leg placement increases,
     the range of the sampled command goals is expanded.
@@ -172,6 +172,19 @@ def pedipulation_multileg_levels_size(
     # If the mean error is below the threshold, update the command curriculum ranges.
     if mean_error < 0.06:
         command_term = env.command_manager.get_term("foot_position")
-        command_term.update_curriculums(curriculum_factor=0.2)
+        command_term.update_curriculums(curriculum_factor = 0.2)
+    
+    ranges = env.command_manager.get_term("foot_position").cfg.ranges
+    curr_metrics = dict()
+    
+    curr_metrics[f"CommandRange/pos_x_0"] = ranges.pos_x[0]
+    curr_metrics[f"CommandRange/pos_x_1"] = ranges.pos_x[1]
+    curr_metrics[f"CommandRange/pos_y_0"] = ranges.pos_y[0]
+    curr_metrics[f"CommandRange/pos_y_1"] = ranges.pos_y[1]
+    curr_metrics[f"CommandRange/pos_z_0"] = ranges.pos_z[0]
+    curr_metrics[f"CommandRange/pos_z_1"] = ranges.pos_z[1]
+    curr_metrics[f"MeanError"] = mean_error
 
-    return mean_error
+        
+    return curr_metrics
+    
