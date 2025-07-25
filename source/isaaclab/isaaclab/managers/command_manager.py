@@ -209,10 +209,10 @@ class CommandTerm(ManagerTermBase):
         """Update the command based on the current state."""
         raise NotImplementedError
     
-    # @abstractmethod
-    # def update_curriculums(self, curriculum_factor: float):
-    #     """Update the command curriculums."""
-    #     raise NotImplementedError
+    @abstractmethod
+    def update_curriculums(self, curriculum_factor: float):
+        """Update the command curriculums."""
+        raise NotImplementedError
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         """Set debug visualization into visualization objects.
