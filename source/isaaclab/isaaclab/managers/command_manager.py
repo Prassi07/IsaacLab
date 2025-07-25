@@ -365,13 +365,13 @@ class CommandManager(ManagerBase):
                 extras[f"Metrics/{name}/{metric_name}"] = metric_value
         # return logged information
         
-        """ Adding custom for just pedipulation task"""
-        extras[f"Metrics/CommandRange/pos_x_0"] = self._terms["foot_position"].cfg.ranges.pos_x[0]
-        extras[f"Metrics/CommandRange/pos_x_1"] = self._terms["foot_position"].cfg.ranges.pos_x[1]
-        extras[f"Metrics/CommandRange/pos_y_0"] = self._terms["foot_position"].cfg.ranges.pos_y[0]
-        extras[f"Metrics/CommandRange/pos_y_1"] = self._terms["foot_position"].cfg.ranges.pos_y[1]
-        extras[f"Metrics/CommandRange/pos_z_0"] = self._terms["foot_position"].cfg.ranges.pos_z[0]
-        extras[f"Metrics/CommandRange/pos_z_1"] = self._terms["foot_position"].cfg.ranges.pos_z[1]
+        # """ Adding custom for just pedipulation task"""
+        # extras[f"Metrics/CommandRange/pos_x_0"] = self._terms["foot_position"].cfg.ranges.pos_x[0]
+        # extras[f"Metrics/CommandRange/pos_x_1"] = self._terms["foot_position"].cfg.ranges.pos_x[1]
+        # extras[f"Metrics/CommandRange/pos_y_0"] = self._terms["foot_position"].cfg.ranges.pos_y[0]
+        # extras[f"Metrics/CommandRange/pos_y_1"] = self._terms["foot_position"].cfg.ranges.pos_y[1]
+        # extras[f"Metrics/CommandRange/pos_z_0"] = self._terms["foot_position"].cfg.ranges.pos_z[0]
+        # extras[f"Metrics/CommandRange/pos_z_1"] = self._terms["foot_position"].cfg.ranges.pos_z[1]
         
         return extras
 

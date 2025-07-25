@@ -25,6 +25,7 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.spot.flat_env_cfg i
 # Pre-defined configs
 ##
 from isaaclab_assets.robots.spot import SPOT_CFG  # isort: skip
+from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG, ROUGH_TERRAINS_CFG_3
 
 COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
     size=(8.0, 8.0),
@@ -105,7 +106,7 @@ class SpotObservationsRoughCfg:
         )
 
         def __post_init__(self):
-            self.enable_corruption = True
+            self.enable_corruption = False
             self.concatenate_terms = True
 
     # observation groups
@@ -166,6 +167,23 @@ class SpotEventRoughCfg:
             },
         },
     )
+    
+    # reset_base = EventTerm(
+    #     func=mdp.reset_root_state_from_terrain,
+    #     mode="reset",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot"),
+    #         "pose_range": {"yaw": (-3.14, 3.14)},
+    #         "velocity_range": {
+    #             "x": (-1.5, 1.5),
+    #             "y": (-1.0, 1.0),
+    #             "z": (-0.5, 0.5),
+    #             "roll": (-0.7, 0.7),
+    #             "pitch": (-0.7, 0.7),
+    #             "yaw": (-1.0, 1.0),
+    #         },
+    #     },
+    # )
 
     reset_robot_joints = EventTerm(
         func=spot_mdp.reset_joints_around_default,
@@ -191,17 +209,8 @@ class SpotEventRoughCfg:
 
 @configclass
 class SpotRewardsRoughCfg:
-    # -- task
-    air_time = RewardTermCfg(
-        func=spot_mdp.air_time_reward,
-        weight=5.0,
-        params={
-            "mode_time": 0.3,
-            "velocity_threshold": 0.5,
-            "asset_cfg": SceneEntityCfg("robot"),
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
-        },
-    )
+    
+    # -- task rewards --
     base_angular_velocity = RewardTermCfg(
         func=spot_mdp.base_angular_velocity_reward,
         weight=5.0,
@@ -212,6 +221,26 @@ class SpotRewardsRoughCfg:
         weight=5.0,
         params={"std": 1.0, "ramp_rate": 0.5, "ramp_at_vel": 1.0, "asset_cfg": SceneEntityCfg("robot")},
     )
+    
+    base_motion = RewardTermCfg(
+        func=spot_mdp.base_motion_penalty, 
+        weight=-2.0, 
+        params={"asset_cfg": SceneEntityCfg("robot"), "std": 1.0}
+    )
+    
+    # -- Style rewards --
+    
+    air_time = RewardTermCfg(
+        func=spot_mdp.air_time_reward,
+        weight=5.0,
+        params={
+            "mode_time": 0.3,
+            "velocity_threshold": 0.5,
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+        },
+    )
+    
     foot_clearance = RewardTermCfg(
         func=spot_mdp.foot_clearance_reward,
         weight=0.5,
@@ -222,15 +251,15 @@ class SpotRewardsRoughCfg:
             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
         },
     )
-    standing_reward =RewardTermCfg(
-        weight = 2.5,
-        func = spot_mdp.standing_reward,
-        params = {
-            "asset_cfg": SceneEntityCfg("robot"),
-            "std": 0.1,
-            "velocity_threshold": 0.25,
-        },        
-    )
+    # standing_reward =RewardTermCfg(
+    #     weight = 5.0,
+    #     func = spot_mdp.standing_reward_xy,
+    #     params = {
+    #         "asset_cfg": SceneEntityCfg("robot"),
+    #         "velocity_threshold": 0.1,
+    #     },        
+    # )
+    
     gait = RewardTermCfg(
         func=spot_mdp.GaitReward,
         weight=10.0,
@@ -243,20 +272,17 @@ class SpotRewardsRoughCfg:
             "sensor_cfg": SceneEntityCfg("contact_forces"),
         },
     )
-
-    # -- penalties
-    action_smoothness = RewardTermCfg(func=spot_mdp.action_smoothness_penalty, weight=-1.0)
+    
     air_time_variance = RewardTermCfg(
         func=spot_mdp.air_time_variance_penalty,
         weight=-1.0,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot")},
     )
-    base_motion = RewardTermCfg(
-        func=spot_mdp.base_motion_penalty, weight=-2.0, params={"asset_cfg": SceneEntityCfg("robot")}
-    )
+
     base_orientation = RewardTermCfg(
         func=spot_mdp.base_orientation_penalty, weight=-3.0, params={"asset_cfg": SceneEntityCfg("robot")}
     )
+    
     foot_slip = RewardTermCfg(
         func=spot_mdp.foot_slip_penalty,
         weight=-0.5,
@@ -266,30 +292,43 @@ class SpotRewardsRoughCfg:
             "threshold": 1.0,
         },
     )
-    joint_acc = RewardTermCfg(
-        func=spot_mdp.joint_acceleration_penalty,
-        weight=-1.0e-4,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
+
+
+    # -- regularization rewards --
+    
+    action_smoothness = RewardTermCfg(
+        func=spot_mdp.action_smoothness_penalty, 
+        weight=-1.0
     )
+    
     joint_pos = RewardTermCfg(
         func=spot_mdp.joint_position_penalty,
         weight=-0.7,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.5,
+            "stand_still_scale": 15.0,
+            "velocity_threshold": 0.75,
         },
     )
-    joint_torques = RewardTermCfg(
-        func=spot_mdp.joint_torques_penalty,
-        weight=-5.0e-4,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},
-    )
+    
     joint_vel = RewardTermCfg(
         func=spot_mdp.joint_velocity_penalty,
         weight=-1.0e-2,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
     )
+    
+    joint_acc = RewardTermCfg(
+        func=spot_mdp.joint_acceleration_penalty,
+        weight=-1.0e-4,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_h[xy]")},
+    )
+    
+    joint_torques = RewardTermCfg(
+        func=spot_mdp.joint_torques_penalty,
+        weight=-5.0e-4,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},
+    )
+    
 
 
 @configclass
@@ -356,7 +395,27 @@ class SpotRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             self.scene.height_scanner.update_period = self.decimation * self.sim.dt
         if self.scene.contact_forces is not None:
             self.scene.contact_forces.update_period = self.sim.dt
-            
+        
+        self.scene.terrain = TerrainImporterCfg(
+            prim_path="/World/ground",
+            terrain_type="generator",
+            terrain_generator=ROUGH_TERRAINS_CFG_3,
+            max_init_terrain_level=ROUGH_TERRAINS_CFG_3.num_rows - 1,
+            collision_group=-1,
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply",
+                restitution_combine_mode="multiply",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+            ),
+            visual_material=sim_utils.MdlFileCfg(
+                mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+                project_uvw=True,
+                texture_scale=(0.25, 0.25),
+            ),
+            debug_vis=True,
+        )
+        
         # terrain
         if getattr(self.curriculum, "terrain_levels", None) is not None:
             if self.scene.terrain.terrain_generator is not None:

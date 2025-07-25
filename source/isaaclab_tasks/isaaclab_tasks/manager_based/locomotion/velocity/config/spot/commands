@@ -1,3 +1,6 @@
 ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Pedipulate-Spot-Play-v0 --num_envs 64
 ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Pedipulate-Spot-v0 --num_envs 4096 --headless
 ./isaaclab.sh -p -m tensorboard.main --logdir logs/rsl_rl/spot_pedipulate/2025-05-
+
+
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Rough-Spot-v0 --num_envs 8192 --headless 
