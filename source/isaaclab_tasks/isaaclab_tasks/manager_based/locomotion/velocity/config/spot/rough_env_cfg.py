@@ -222,11 +222,12 @@ class SpotRewardsRoughCfg:
         params={"std": 1.0, "ramp_rate": 0.5, "ramp_at_vel": 1.0, "asset_cfg": SceneEntityCfg("robot")},
     )
     
-    base_motion = RewardTermCfg(
-        func=spot_mdp.base_motion_penalty_paper, 
-        weight=-2.0, 
-        params={"asset_cfg": SceneEntityCfg("robot"), "std": 1.0}
-    )
+    # base_motion = RewardTermCfg(
+    #     func=spot_mdp.base_motion_penalty_paper, 
+    #     weight=-2.0, 
+    #     params={"asset_cfg": SceneEntityCfg("robot"), "std": 1.0}
+    # ) # Removed this as this penalized roll-and-pitch rate which might be non-zero on staircases.
+    
     
     # -- Style rewards --
     
@@ -279,8 +280,18 @@ class SpotRewardsRoughCfg:
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot")},
     )
 
-    base_orientation = RewardTermCfg(
-        func=spot_mdp.base_orientation_penalty, weight=-3.0, params={"asset_cfg": SceneEntityCfg("robot")}
+    # base_orientation = RewardTermCfg(
+    #     func=spot_mdp.base_orientation_penalty, weight=-3.0, params={"asset_cfg": SceneEntityCfg("robot")}
+    # ) # Replacing with better reward that is non for flat ground.
+    
+    base_orientation = RewardTermCfg(spot_mdp.body_terrain_alignment_reward,
+                                    weight = 10.0,
+                                    params={
+                                        "robot_cfg": SceneEntityCfg("robot"),
+                                        "leg_asset_cfg":  SceneEntityCfg("robot", body_names=".*_foot"),
+                                        "contact_sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+                                        "force_threshold" : 1.0,
+                                    }
     )
     
     foot_slip = RewardTermCfg(
@@ -303,11 +314,11 @@ class SpotRewardsRoughCfg:
     
     joint_pos = RewardTermCfg(
         func=spot_mdp.joint_position_penalty,
-        weight=-0.7,
+        weight=-1.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stand_still_scale": 15.0,
-            "velocity_threshold": 0.75,
+            "stand_still_scale": 30.0,
+            "velocity_threshold": 0.5,
         },
     )
     
@@ -359,7 +370,7 @@ class SpotCurriculumRoughCfg:
 class SpotRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
     # Basic settings'
-    scene: MySceneCfg = MySceneCfg(num_envs = 4096, env_spacing = 2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs = 4096, env_spacing = 8.0)
     observations: SpotObservationsRoughCfg = SpotObservationsRoughCfg()
     actions: SpotActionsRoughCfg = SpotActionsRoughCfg()
     commands: SpotCommandsRoughCfg = SpotCommandsRoughCfg()

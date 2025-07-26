@@ -43,12 +43,12 @@ class SpotRoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 100000
     save_interval = 1000
-    experiment_name = "spot_rough"
+    experiment_name = "spot_rough_v3"
     empirical_normalization = False
     store_code_state = False
     resume = False
-    load_checkpoint = "model_116999.pt"
-    load_run = "2025-04-03_23-38-47"
+    # load_checkpoint = "model_116999.pt"
+    # load_run = "2025-04-03_23-38-47"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_hidden_dims=[512, 256, 128],
@@ -107,7 +107,7 @@ class SpotPedipulatePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 200000
     save_interval = 2000
-    experiment_name = "spot_pedipulate"
+    experiment_name = "spot_pedipulate_v3"
     empirical_normalization = False
     store_code_state = False
     # resume = True
