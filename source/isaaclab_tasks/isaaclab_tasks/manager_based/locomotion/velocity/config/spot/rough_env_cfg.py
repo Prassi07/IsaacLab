@@ -284,7 +284,7 @@ class SpotRewardsRoughCfg:
     #     func=spot_mdp.base_orientation_penalty, weight=-3.0, params={"asset_cfg": SceneEntityCfg("robot")}
     # ) # Replacing with better reward that is non for flat ground.
     
-    base_orientation = RewardTermCfg(spot_mdp.body_terrain_alignment_reward,
+    base_orientation = RewardTermCfg(spot_mdp.body_terrain_alignment_reward_walking,
                                     weight = 10.0,
                                     params={
                                         "robot_cfg": SceneEntityCfg("robot"),
