@@ -131,3 +131,66 @@ def body_terrain_alignment_reward_walking(
     final_reward = torch.where(is_standing_command_mask & valid_envs_mask, alignment_reward, 0.0)
     
     return final_reward
+
+def zero_velocity_reward_walking(
+    env: ManagerBasedRLEnv,
+    robot_cfg: SceneEntityCfg,
+    contact_sensor_cfg: SceneEntityCfg,
+    force_threshold: float,
+    velocity_std: float,
+) -> torch.Tensor:
+    """
+    Rewards the robot for standing stably on four feet when a standing command is issued.
+
+    This reward is only active when the command is [0, 0] (standing). It checks for:
+    1. Contact on all four feet, verified by checking contact forces.
+    2. Minimal linear and angular velocity of the base to ensure stillness.
+    3. An upright body orientation (minimal roll and pitch).
+    """
+    # --- 1. Extract assets and check for standing command ---
+
+    # Extract robot and contact sensor from the environment scene
+    robot: Articulation = env.scene[robot_cfg.name]
+    contact_sensor: ContactSensor = env.scene[contact_sensor_cfg.name]
+
+    # Get the 5D command from the command manager
+    cmd = torch.linalg.norm(env.command_manager.get_command("base_velocity"), dim=1)
+    is_standing_command_mask = cmd < 0.1
+
+    # --- 2. Check for four-leg contact ---
+
+    # Get contact forces on all bodies tracked by the sensor
+    net_contact_forces = contact_sensor.data.net_forces_w
+    # Get the vertical component (Z-axis) of the forces on the four feet
+    feet_forces_z = net_contact_forces[:, contact_sensor_cfg.body_ids, 2]
+    
+    # Check if each foot has a contact force greater than the threshold
+    # The result is a boolean tensor of shape (num_envs, 4)
+    feet_in_contact = feet_forces_z > force_threshold
+    # Check if all four feet are in contact for each environment
+    # The result is a boolean tensor of shape (num_envs,)
+    all_four_feet_in_contact = torch.all(feet_in_contact, dim=1)
+
+    # --- 3. Reward for stability (low velocity) ---
+    base_lin_vel = robot.data.root_lin_vel_b
+    base_ang_vel = robot.data.root_ang_vel_b
+    velocity_error = torch.norm(base_lin_vel, dim=1) + 0.5 * torch.norm(base_ang_vel, dim=1)
+    velocity_reward = torch.exp(-velocity_error / velocity_std)
+
+    # The reward is only applied if the command is "stand" AND all four feet are on the ground, Otherwise, the reward is zero.
+    final_reward = torch.where(is_standing_command_mask & all_four_feet_in_contact, velocity_reward, 0.0)
+
+    return final_reward
+
+def joint_position_penalty(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, stand_still_scale: float, velocity_threshold: float
+) -> torch.Tensor:
+    """Penalize joint position error from default on the articulation."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    cmd = torch.linalg.norm(env.command_manager.get_command("base_velocity"), dim=1)
+    body_vel_xy = torch.linalg.norm(asset.data.root_lin_vel_b[:, :2], dim=1)
+    body_vel_z = torch.abs(asset.data.root_ang_vel_b[:, 2])
+    body_vel = body_vel_xy + body_vel_z
+    reward = torch.linalg.norm((asset.data.joint_pos - asset.data.default_joint_pos), dim=1)
+    return torch.where(torch.logical_and(cmd > 0.1, body_vel > velocity_threshold), reward, stand_still_scale * reward)

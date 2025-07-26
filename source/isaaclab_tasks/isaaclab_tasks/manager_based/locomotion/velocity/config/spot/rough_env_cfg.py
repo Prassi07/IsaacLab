@@ -252,14 +252,17 @@ class SpotRewardsRoughCfg:
             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
         },
     )
-    # standing_reward =RewardTermCfg(
-    #     weight = 5.0,
-    #     func = spot_mdp.standing_reward_xy,
-    #     params = {
-    #         "asset_cfg": SceneEntityCfg("robot"),
-    #         "velocity_threshold": 0.1,
-    #     },        
-    # )
+    
+    standing_reward =RewardTermCfg(
+        weight = 5.0,
+        func = spot_mdp.zero_velocity_reward_walking,
+        params = {
+            "robot_cfg": SceneEntityCfg("robot"),
+            "contact_sensor_cfg" : SceneEntityCfg("contact_forces", body_names=".*_foot"),
+            "force_threshold": 1.0
+            "velocity_std": 1.0,
+        },        
+    )
     
     gait = RewardTermCfg(
         func=spot_mdp.GaitReward,
