@@ -259,7 +259,7 @@ class SpotRewardsRoughCfg:
         params = {
             "robot_cfg": SceneEntityCfg("robot"),
             "contact_sensor_cfg" : SceneEntityCfg("contact_forces", body_names=".*_foot"),
-            "force_threshold": 1.0
+            "force_threshold": 1.0,
             "velocity_std": 1.0,
         },        
     )
