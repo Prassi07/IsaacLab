@@ -65,10 +65,10 @@ class UniformPosition3dCommand(CommandTerm):
         self.pos_command_b = torch.zeros_like(self.pos_command_w)
         
         # -- final command: (x, y, z, leg_choice_left, leg_choice_right)
-        self.pos_leg_command_b = torch.zeros(self.num_envs, 5, device=self.device)
+        self.pos_leg_command_b = torch.zeros(self.num_envs, 6, device=self.device)
         
-        # -- leg switch command: [1,0] for left, [0,1] for right, [0,0] for standing
-        self.leg_switch_command = torch.zeros(self.num_envs, 2, device=self.device)
+        # -- leg switch command: [1,0] for left, [0,1] for right, [0,0] for standing, Index 3 is to be okay with contact or no contact.
+        self.leg_switch_command = torch.zeros(self.num_envs, 3, device=self.device)
         
         # -- buffer for zero orientation for visualizers
         self.zero_orientations = torch.zeros(self.num_envs, 1, device=self.device)
@@ -148,6 +148,8 @@ class UniformPosition3dCommand(CommandTerm):
         # For stepping commands, decide between left and right leg
         is_left_leg_swing_mask = r_for_sampling.uniform_(0, 1) < 0.5
 
+        avoid_obstacle_mask = r_for_sampling.uniform_(0, 1) < 0.5
+        
         # Set the 2-bit command based on the decisions
         # Default to standing [0, 0]
         self.leg_switch_command[env_ids] = 0.0
@@ -155,6 +157,9 @@ class UniformPosition3dCommand(CommandTerm):
         self.leg_switch_command[env_ids, 0] = torch.where(~is_standing_mask & is_left_leg_swing_mask, 1.0, 0.0)
         # Where not standing and right swing, set to [0, 1]
         self.leg_switch_command[env_ids, 1] = torch.where(~is_standing_mask & ~is_left_leg_swing_mask, 1.0, 0.0)
+        
+        # Contact okay or no.
+        self.leg_switch_command[env_ids, 1] = torch.where(~is_standing_mask & avoid_obstacle_mask, 1.0, 0.0)
         
         # Sample x and z position commands in the base frame
         self.pos_command_b[env_ids, 0] = r_for_sampling.uniform_(*self.cfg.ranges.pos_x)
@@ -241,7 +246,7 @@ class UniformPosition3dCommand(CommandTerm):
         """
         target_vec = self.pos_command_w - self.robot.data.root_pos_w[:, :3]
         self.pos_leg_command_b[:, :3] = quat_rotate_inverse(self.robot.data.root_quat_w, target_vec)
-        self.pos_leg_command_b[:, 3:5] = self.leg_switch_command
+        self.pos_leg_command_b[:, 3:6] = self.leg_switch_command
         
 
     def _set_debug_vis_impl(self, debug_vis: bool):

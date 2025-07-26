@@ -33,6 +33,8 @@ INSTALL_REQUIRES = [
     "tensorboard",
     # video recording
     "moviepy",
+    # reinforcement learning
+    "gymnasium==1.2",
     # make sure this is consistent with isaac sim version
     "pillow==11.0.0",
 ]

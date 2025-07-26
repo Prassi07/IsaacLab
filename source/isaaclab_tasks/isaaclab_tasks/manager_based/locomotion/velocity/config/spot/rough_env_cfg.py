@@ -223,7 +223,7 @@ class SpotRewardsRoughCfg:
     )
     
     base_motion = RewardTermCfg(
-        func=spot_mdp.base_motion_penalty, 
+        func=spot_mdp.base_motion_penalty_paper, 
         weight=-2.0, 
         params={"asset_cfg": SceneEntityCfg("robot"), "std": 1.0}
     )

@@ -689,6 +689,62 @@ def body_terrain_alignment_reward(
     
     return final_reward
 
+def penalize_foot_contact_w_obstacle( 
+    env: ManagerBasedRLEnv,
+    robot_cfg: SceneEntityCfg,
+    left_leg_contact_cfg: SceneEntityCfg,
+    right_leg_contact_cfg: SceneEntityCfg,
+    contact_force_threshold: float,
+) -> torch.Tensor:
+    
+    # Get the 6D command: (local_x, local_y, local_z, left_cmd, right_cmd, avoid_cmd)
+    full_command = env.command_manager.get_command("foot_position")
+
+    # Extract the command bits for each leg and the avoid obstacle flag
+    leg_commands = full_command[:, 3:5]
+    # Convert the avoid command flag to a boolean tensor for logical operations
+    is_avoid_obstacle_command = full_command[:, 5] == 1.0
+
+    # Create boolean masks based on which leg is commanded to move
+    is_left_leg_commanded = leg_commands[:, 0] == 1.0
+    is_right_leg_commanded = leg_commands[:, 1] == 1.0
+
+    # --- 2. Check for Foot Contact ---
+
+    # Access the contact sensors for each foot
+    left_foot_sensor: ContactSensor = env.scene.sensors[left_leg_contact_cfg.name]
+    right_foot_sensor: ContactSensor = env.scene.sensors[right_leg_contact_cfg.name]
+
+    # Get the latest net contact force from the sensor's history buffer
+    # The shape is (num_envs, 3)
+    left_foot_forces_full = left_foot_sensor.data.net_forces_w
+    left_foot_forces = left_foot_forces_full[:, left_leg_contact_cfg.body_ids, :]
+    
+    right_foot_forces_full = right_foot_sensor.data.net_forces_w
+    right_foot_forces = right_foot_forces_full[:, right_leg_contact_cfg.body_ids, :]
+
+    # Check if the magnitude (norm) of the contact force exceeds the threshold
+    is_left_foot_in_contact = (torch.norm(left_foot_forces, dim=-1) > contact_force_threshold).squeeze(-1)
+    is_right_foot_in_contact = (torch.norm(left_foot_forces, dim=-1) > contact_force_threshold).squeeze(-1)
+    
+    # --- 3. Apply Penalty Logic ---
+
+    # Penalize the left foot only if:
+    # (it's an avoid command) AND (the left leg is commanded) AND (the left foot makes contact)
+    left_penalty = (
+        is_avoid_obstacle_command & is_left_leg_commanded & is_left_foot_in_contact
+    ).float()
+
+    # Penalize the right foot only if:
+    # (it's an avoid command) AND (the right leg is commanded) AND (the right foot makes contact)
+    right_penalty = (
+        is_avoid_obstacle_command & is_right_leg_commanded & is_right_foot_in_contact
+    ).float()
+    
+    
+    return left_penalty + right_penalty
+
+
 
 def default_joint_pos_reward(
     env: ManagerBasedRLEnv, 
