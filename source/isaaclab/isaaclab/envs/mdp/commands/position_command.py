@@ -159,7 +159,7 @@ class UniformPosition3dCommand(CommandTerm):
         self.leg_switch_command[env_ids, 1] = torch.where(~is_standing_mask & ~is_left_leg_swing_mask, 1.0, 0.0)
         
         # Contact okay or no.
-        self.leg_switch_command[env_ids, 1] = torch.where(~is_standing_mask & avoid_obstacle_mask, 1.0, 0.0)
+        self.leg_switch_command[env_ids, 2] = torch.where(~is_standing_mask & avoid_obstacle_mask, 1.0, 0.0)
         
         # Sample x and z position commands in the base frame
         self.pos_command_b[env_ids, 0] = r_for_sampling.uniform_(*self.cfg.ranges.pos_x)
