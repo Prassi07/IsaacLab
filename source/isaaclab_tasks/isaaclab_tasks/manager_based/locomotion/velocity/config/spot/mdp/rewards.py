@@ -725,7 +725,7 @@ def penalize_foot_contact_w_obstacle(
 
     # Check if the magnitude (norm) of the contact force exceeds the threshold
     is_left_foot_in_contact = (torch.norm(left_foot_forces, dim=-1) > contact_force_threshold).squeeze(-1)
-    is_right_foot_in_contact = (torch.norm(left_foot_forces, dim=-1) > contact_force_threshold).squeeze(-1)
+    is_right_foot_in_contact = (torch.norm(right_foot_forces, dim=-1) > contact_force_threshold).squeeze(-1)
     
     # --- 3. Apply Penalty Logic ---
 

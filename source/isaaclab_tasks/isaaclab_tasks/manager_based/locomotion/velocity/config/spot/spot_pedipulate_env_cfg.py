@@ -306,15 +306,15 @@ class SpotRewardsPedipulateCfg:
         weight=-200.0,
     )
 
-    penalize_contact =  RewardTermCfg(
-        func=spot_mdp.penalize_foot_contact_w_obstacle,
-        weight=-10.0,
-        params={"robot_cfg": SceneEntityCfg("robot"),
-            "left_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fl_foot"),
-            "right_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fr_foot"),
-            "contact_force_threshold": 1.0
-        },
-    )
+    # penalize_contact =  RewardTermCfg(
+    #     func=spot_mdp.penalize_foot_contact_w_obstacle,
+    #     weight=-10.0,
+    #     params={"robot_cfg": SceneEntityCfg("robot"),
+    #         "left_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fl_foot"),
+    #         "right_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fr_foot"),
+    #         "contact_force_threshold": 1.0
+    #     },
+    # )
 
 @configclass
 class SpotTerminationsPedipulateCfg:
