@@ -65,7 +65,7 @@ class UniformPosition3dCommand(CommandTerm):
         self.pos_command_b = torch.zeros_like(self.pos_command_w)
         
         # -- final command: (x, y, z, leg_choice_left, leg_choice_right, avoid_obs)
-        self.pos_leg_command_b = torch.zeros(self.num_envs, 5, device=self.device)
+        self.pos_leg_command_b = torch.zeros(self.num_envs, 6, device=self.device)
         
         # -- leg switch command: [1,0] for left, [0,1] for right, [0,0] for standing, 
         self.leg_switch_command = torch.zeros(self.num_envs, 2, device=self.device)
@@ -161,7 +161,7 @@ class UniformPosition3dCommand(CommandTerm):
         self.leg_switch_command[env_ids, 1] = torch.where(~is_standing_mask & ~is_left_leg_swing_mask, 1.0, 0.0)
         
         # Contact okay or no.
-        self.foot_obs_avoid_command = torch.where(~is_standing_mask & avoid_obstacle_mask, 1.0, 0.0)
+        self.foot_obs_avoid_command[env_ids, 0]= torch.where(~is_standing_mask & avoid_obstacle_mask, 1.0, 0.0)
         
         # Sample x and z position commands in the base frame
         self.pos_command_b[env_ids, 0] = r_for_sampling.uniform_(*self.cfg.ranges.pos_x)
@@ -249,7 +249,7 @@ class UniformPosition3dCommand(CommandTerm):
         target_vec = self.pos_command_w - self.robot.data.root_pos_w[:, :3]
         self.pos_leg_command_b[:, :3] = quat_rotate_inverse(self.robot.data.root_quat_w, target_vec)
         self.pos_leg_command_b[:, 3:5] = self.leg_switch_command
-        # self.pos_leg_command_b[:, 5] = self.foot_obs_avoid_command
+        self.pos_leg_command_b[:, 5] = self.foot_obs_avoid_command.squeeze()
         
 
     def _set_debug_vis_impl(self, debug_vis: bool):

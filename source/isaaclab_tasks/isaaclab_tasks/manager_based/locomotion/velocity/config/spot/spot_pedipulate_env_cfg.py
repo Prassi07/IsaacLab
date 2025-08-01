@@ -201,10 +201,10 @@ class SpotEventPedipulateCfg:
     apply_force_left_leg = EventTerm(
         func=mdp.apply_external_force_torque_left_leg,
         mode="interval",
-        interval_range_s=(13.0, 13.0),
+        interval_range_s=(5.0, 15.0),
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="fl_foot"),
-            "force_range": (0.0, 12.0),
+            "force_range": (-12.0, 12.0),
             "torque_range": (0.0, 0.0),
         }
     )
@@ -212,10 +212,10 @@ class SpotEventPedipulateCfg:
     apply_force_right_leg = EventTerm(
         func=mdp.apply_external_force_torque_right_leg,
         mode="interval",
-        interval_range_s=(13.0, 13.0),
+        interval_range_s=(5.0, 15.0),
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="fr_foot"),
-            "force_range": (0.0, 12.0),
+            "force_range": (-12.0, 12.0),
             "torque_range": (0.0, 0.0),
         }
     )
@@ -306,15 +306,15 @@ class SpotRewardsPedipulateCfg:
         weight=-200.0,
     )
 
-    # penalize_contact =  RewardTermCfg(
-    #     func=spot_mdp.penalize_foot_contact_w_obstacle,
-    #     weight=-10.0,
-    #     params={"robot_cfg": SceneEntityCfg("robot"),
-    #         "left_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fl_foot"),
-    #         "right_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fr_foot"),
-    #         "contact_force_threshold": 1.0
-    #     },
-    # )
+    penalize_contact =  RewardTermCfg(
+        func=spot_mdp.penalize_foot_contact_w_obstacle,
+        weight=-10.0,
+        params={"robot_cfg": SceneEntityCfg("robot"),
+            "left_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fl_foot"),
+            "right_leg_contact_cfg" : SceneEntityCfg("contact_forces", body_names="fr_foot"),
+            "contact_force_threshold": 1.0
+        },
+    )
 
 @configclass
 class SpotTerminationsPedipulateCfg:
