@@ -151,29 +151,12 @@ class SpotEventRoughCfg:
         },
     )
 
-    reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
-        mode="reset",
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),
-            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
-            "velocity_range": {
-                "x": (-1.5, 1.5),
-                "y": (-1.0, 1.0),
-                "z": (-0.5, 0.5),
-                "roll": (-0.7, 0.7),
-                "pitch": (-0.7, 0.7),
-                "yaw": (-1.0, 1.0),
-            },
-        },
-    )
-    
     # reset_base = EventTerm(
-    #     func=mdp.reset_root_state_from_terrain,
+    #     func=mdp.reset_root_state_uniform,
     #     mode="reset",
     #     params={
     #         "asset_cfg": SceneEntityCfg("robot"),
-    #         "pose_range": {"yaw": (-3.14, 3.14)},
+    #         "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
     #         "velocity_range": {
     #             "x": (-1.5, 1.5),
     #             "y": (-1.0, 1.0),
@@ -184,6 +167,23 @@ class SpotEventRoughCfg:
     #         },
     #     },
     # )
+    
+    reset_base = EventTerm(
+        func=mdp.reset_root_state_from_terrain,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "pose_range": {"yaw": (-3.14, 3.14)},
+            "velocity_range": {
+                "x": (-1.5, 1.5),
+                "y": (-1.0, 1.0),
+                "z": (-0.5, 0.5),
+                "roll": (-0.7, 0.7),
+                "pitch": (-0.7, 0.7),
+                "yaw": (-1.0, 1.0),
+            },
+        },
+    )
 
     reset_robot_joints = EventTerm(
         func=spot_mdp.reset_joints_around_default,
