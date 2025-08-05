@@ -158,6 +158,18 @@ ROUGH_TERRAINS_CFG_3 = TerrainGeneratorCfg(
             holes=False,
             flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
+        "boxes": terrain_gen.MeshRandomGridTerrainCfg(
+            proportion=0.1, grid_width=0.45, grid_height_range=(0.05, 0.15), platform_width=1.0, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+        ),
+        "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
+            proportion=0.1, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+        ),
+        "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
+            proportion=0.1, slope_range=(0.0, 0.5), platform_width=1.0, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+        ),
+        "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
+            proportion=0.1, slope_range=(0.0, 0.5), platform_width=1.0, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+        ),
         "pyramid_stairs_inv1": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
             proportion=0.075,
             step_height_range=(0.08, 0.23),
@@ -176,22 +188,10 @@ ROUGH_TERRAINS_CFG_3 = TerrainGeneratorCfg(
             holes=False,
             flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
         ),
-        "boxes": terrain_gen.MeshRandomGridTerrainCfg(
-            proportion=0.05, grid_width=0.45, grid_height_range=(0.05, 0.25), platform_width=1.0, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
-        ),
-        "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
-            proportion=0.05, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
-        ),
-        "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.5), platform_width=1.0, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
-        ),
-        "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.5), platform_width=1.0, border_width=0.25, flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
-        ),
-        "hf_discrete_terrain": terrain_gen.HfDiscreteObstaclesTerrainCfg(
-            proportion=0.1, platform_width=1.0, border_width=0.25, num_obstacles = 20, obstacle_width_range = (0.2, 0.8), 
-            obstacle_height_range = (-0.2, 0.6), flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
-        ),
+        # "hf_discrete_terrain": terrain_gen.HfDiscreteObstaclesTerrainCfg(
+        #     proportion=0.1, platform_width=1.0, border_width=0.25, num_obstacles = 20, obstacle_width_range = (0.2, 0.8), 
+        #     obstacle_height_range = (-0.2, 0.6), flat_patch_sampling={'init_pos': FLAT_SAMPLING_CFG_2}
+        # ),
     },
 )
 

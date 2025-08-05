@@ -151,29 +151,12 @@ class SpotEventRoughCfg:
         },
     )
 
-    # reset_base = EventTerm(
-    #     func=mdp.reset_root_state_uniform,
-    #     mode="reset",
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot"),
-    #         "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
-    #         "velocity_range": {
-    #             "x": (-1.5, 1.5),
-    #             "y": (-1.0, 1.0),
-    #             "z": (-0.5, 0.5),
-    #             "roll": (-0.7, 0.7),
-    #             "pitch": (-0.7, 0.7),
-    #             "yaw": (-1.0, 1.0),
-    #         },
-    #     },
-    # )
-    
     reset_base = EventTerm(
-        func=mdp.reset_root_state_from_terrain,
+        func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pose_range": {"yaw": (-3.14, 3.14)},
+            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
             "velocity_range": {
                 "x": (-1.5, 1.5),
                 "y": (-1.0, 1.0),
@@ -184,6 +167,23 @@ class SpotEventRoughCfg:
             },
         },
     )
+    
+    # reset_base = EventTerm(
+    #     func=mdp.reset_root_state_from_terrain,
+    #     mode="reset",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot"),
+    #         "pose_range": {"yaw": (-3.14, 3.14)},
+    #         "velocity_range": {
+    #             "x": (-1.5, 1.5),
+    #             "y": (-1.0, 1.0),
+    #             "z": (-0.5, 0.5),
+    #             "roll": (-0.7, 0.7),
+    #             "pitch": (-0.7, 0.7),
+    #             "yaw": (-1.0, 1.0),
+    #         },
+    #     },
+    # )
 
     reset_robot_joints = EventTerm(
         func=spot_mdp.reset_joints_around_default,
@@ -222,13 +222,7 @@ class SpotRewardsRoughCfg:
         params={"std": 1.0, "ramp_rate": 0.5, "ramp_at_vel": 1.0, "asset_cfg": SceneEntityCfg("robot")},
     )
     
-    # base_motion = RewardTermCfg(
-    #     func=spot_mdp.base_motion_penalty_paper, 
-    #     weight=-2.0, 
-    #     params={"asset_cfg": SceneEntityCfg("robot"), "std": 1.0}
-    # ) # Removed this as this penalized roll-and-pitch rate which might be non-zero on staircases.
-    
-    
+
     # -- Style rewards --
     
     air_time = RewardTermCfg(
@@ -243,13 +237,15 @@ class SpotRewardsRoughCfg:
     )
     
     foot_clearance = RewardTermCfg(
-        func=spot_mdp.foot_clearance_reward,
-        weight=0.5,
+        func=spot_mdp.foot_clearance_reward_hs,
+        weight=1.0,
         params={
             "std": 0.05,
             "tanh_mult": 2.0,
-            "target_height": 0.15,
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+            "target_clearance": 0.1,
+            "robot_cfg": SceneEntityCfg("robot"),
+            "feet_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+            "height_scan_cfg": SceneEntityCfg("height_scanner")
         },
     )
     
@@ -282,10 +278,6 @@ class SpotRewardsRoughCfg:
         weight=-1.0,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot")},
     )
-
-    # base_orientation = RewardTermCfg(
-    #     func=spot_mdp.base_orientation_penalty, weight=-3.0, params={"asset_cfg": SceneEntityCfg("robot")}
-    # ) # Replacing with better reward that is non for flat ground.
     
     base_orientation = RewardTermCfg(spot_mdp.body_terrain_alignment_reward_walking,
                                     weight = 10.0,
@@ -309,6 +301,11 @@ class SpotRewardsRoughCfg:
 
 
     # -- regularization rewards --
+    base_roll_motion = RewardTermCfg(
+        func=spot_mdp.roll_penalty, 
+        weight=-2.0, 
+        params={"asset_cfg": SceneEntityCfg("robot"), "std": 1.0}
+    )
     
     action_smoothness = RewardTermCfg(
         func=spot_mdp.action_smoothness_penalty, 

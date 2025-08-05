@@ -3,5 +3,5 @@
 ./isaaclab.sh -p -m tensorboard.main --logdir logs/rsl_rl/spot_pedipulate/2025-05-
 
 
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Rough-Spot-v0 --num_envs 4096 --headless --video --enable_cameras
+CUDA_VISIBLE_DEVICES= ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Rough-Spot-v0 --num_envs 4096 --headless --video --enable_cameras --video_length 250 --video_interval 20000
 ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Pedipulate-Spot-v0 --num_envs 8192 --headless --video --enable_cameras --video_length 250 --video_interval 20000

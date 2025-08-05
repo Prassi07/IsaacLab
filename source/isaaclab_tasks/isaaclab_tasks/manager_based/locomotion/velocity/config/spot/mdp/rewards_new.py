@@ -11,6 +11,8 @@ specify the reward function and its parameters.
 
 from __future__ import annotations
 
+from isaaclab.sensors.ray_caster.patterns.patterns_cfg import GridPatternCfg
+from isaaclab.sensors.ray_caster.ray_caster import RayCaster
 from isaaclab.utils.math import quat_rotate_inverse
 import torch
 from typing import TYPE_CHECKING
@@ -35,6 +37,14 @@ def base_motion_penalty_paper(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg,
     
     return torch.exp(-(vz_2 + vw_2)/std)
 
+def roll_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, std: float) -> torch.Tensor:
+    """Penalize base roll velocity"""
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject = env.scene[asset_cfg.name]
+    
+    v_roll_2 = torch.square(asset.data.root_ang_vel_b[:, 0])
+    
+    return 1.0 - torch.exp(-v_roll_2/std)
 
 def body_terrain_alignment_reward_walking(
     env: ManagerBasedRLEnv,
@@ -194,3 +204,86 @@ def joint_position_penalty(
     body_vel = body_vel_xy + body_vel_z
     reward = torch.linalg.norm((asset.data.joint_pos - asset.data.default_joint_pos), dim=1)
     return torch.where(torch.logical_and(cmd > 0.1, body_vel > velocity_threshold), reward, stand_still_scale * reward)
+
+def get_terrain_height_from_scan(
+    robot_positions_w: torch.Tensor, robot_orienations_w: torch.Tensor, foot_pos_w: torch.Tensor, height_scan_data: torch.Tensor, height_scan_config: GridPatternCfg, num_envs, device
+) -> torch.Tensor:
+    """
+    Gets the terrain height under the feet by finding the NEAREST point in a height scan grid.
+
+    Args:
+        env: The simulation environment.
+        foot_pos_w: The world coordinates of the feet. Shape: (num_envs, num_feet, 3).
+        height_scan_data: The height scan grid data. Shape: (num_envs, grid_rows, grid_cols).
+
+    Returns:
+        A tensor of shape (num_envs, num_feet) with the nearest terrain z-coordinate.
+    """
+    # -- 1. Get necessary data from environment --
+    # You must find these values in your environment's configuration.
+    # The number of columns is no longer in the shape, so it must be from the config.
+    resolution = height_scan_config.resolution
+    grid_cols = 1 + round(height_scan_config.size[0] / resolution)
+    grid_rows = 1 + round(height_scan_config.size[1] / resolution)
+    
+    # -- 2. Transform foot positions from world frame to robot's local frame --
+    foot_pos_relative = foot_pos_w - robot_positions_w.unsqueeze(1)
+    foot_pos_local = quat_rotate_inverse(robot_orienations_w.unsqueeze(1), foot_pos_relative)
+
+    # -- 3. Convert local coordinates to integer 2D grid indices --
+    center_col_idx = (grid_cols - 1) / 2.0
+    center_row_idx = (grid_rows - 1) / 2.0
+    col_idx_float = foot_pos_local[..., 0] / resolution + center_col_idx
+    row_idx_float = foot_pos_local[..., 1] / resolution + center_row_idx
+
+    col_indices = torch.round(col_idx_float).long()
+    row_indices = torch.round(row_idx_float).long()
+
+    # Clamp 2D indices before flattening
+    col_indices.clamp_(0, grid_cols - 1)
+    row_indices.clamp_(0, grid_rows - 1)
+
+    # -- 4. NEW: Calculate the flattened 1D index --
+    # The data is ordered by row, then column (row-major).
+    flat_indices = row_indices * grid_cols + col_indices
+
+    # -- 5. NEW: Direct 1D Lookup --
+    num_feet = foot_pos_w.shape[1]
+    env_indices = torch.arange(num_envs, device=device).unsqueeze(1).expand(-1, num_feet)
+
+    # Use the calculated 1D indices to retrieve height values from the flattened vector.
+    return height_scan_data[env_indices, flat_indices]
+
+def foot_clearance_reward_hs(
+    env: ManagerBasedRLEnv,
+    robot_cfg: SceneEntityCfg,
+    feet_cfg: SceneEntityCfg,
+    height_scan_cfg: SceneEntityCfg,
+    target_clearance: float,
+    std: float,
+    tanh_mult: float,
+) -> torch.Tensor:
+    """Reward the swinging feet for clearing a specified height off the ground terrain."""
+    
+    robot: Articulation = env.scene[robot_cfg.name]
+    
+    feet_asset: RigidObject = env.scene[feet_cfg.name]
+    foot_pos_w = feet_asset.data.body_pos_w[:, feet_cfg.body_ids]
+    
+    # --- The ONLY change is calling the new helper function ---
+
+    sensor: RayCaster = env.scene.sensors[height_scan_cfg.name]
+    
+    # height scan: height = sensor_height - hit_point_z 
+    # height_scan_data = sensor.data.pos_w[:, 2].unsqueeze(1) - sensor.data.ray_hits_w[..., 2] 
+    height_scan_data = sensor.data.ray_hits_w[..., 2]
+    terrain_z_under_foot = get_terrain_height_from_scan(robot.data.root_pos_w, robot.data.root_quat_w, foot_pos_w, height_scan_data, sensor.cfg.pattern_cfg, env.num_envs, env.device)
+
+    # The rest of the function remains identical
+    dynamic_target_height = terrain_z_under_foot + target_clearance
+    foot_z_target_error = torch.square(foot_pos_w[..., 2] - dynamic_target_height)
+    foot_velocity_tanh = torch.tanh(
+        tanh_mult * torch.norm(feet_asset.data.body_lin_vel_w[:, feet_cfg.body_ids, :2], dim=2)
+    )
+    reward = foot_z_target_error * foot_velocity_tanh
+    return torch.exp(-torch.sum(reward, dim=1) / std)
