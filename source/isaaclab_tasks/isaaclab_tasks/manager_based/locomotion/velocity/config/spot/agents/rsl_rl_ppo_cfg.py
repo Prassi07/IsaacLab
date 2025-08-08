@@ -41,8 +41,8 @@ class SpotFlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class SpotRoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 100000
-    save_interval = 1000
+    max_iterations = 50000
+    save_interval = 2000
     experiment_name = "spot_rough_v3"
     empirical_normalization = False
     store_code_state = False

@@ -25,7 +25,7 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.spot.flat_env_cfg i
 # Pre-defined configs
 ##
 from isaaclab_assets.robots.spot import SPOT_CFG  # isort: skip
-from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG, ROUGH_TERRAINS_CFG_3
+from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG, ROUGH_TERRAINS_CFG_3, ROUGH_STAIR_CFG
 
 COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
     size=(8.0, 8.0),
@@ -410,8 +410,8 @@ class SpotRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.terrain = TerrainImporterCfg(
             prim_path="/World/ground",
             terrain_type="generator",
-            terrain_generator=ROUGH_TERRAINS_CFG_3,
-            max_init_terrain_level=ROUGH_TERRAINS_CFG_3.num_rows - 1,
+            terrain_generator=ROUGH_STAIR_CFG,
+            max_init_terrain_level=ROUGH_STAIR_CFG.num_rows - 1,
             collision_group=-1,
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="multiply",

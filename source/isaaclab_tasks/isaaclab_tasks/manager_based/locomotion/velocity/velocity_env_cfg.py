@@ -71,6 +71,7 @@ class MySceneCfg(InteractiveSceneCfg):
         pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[2.4, 1.6]),
         debug_vis=False,
         mesh_prim_paths=["/World/ground"],
+        drift_range = (-0.075, 0.075)
     )
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
     # lights
