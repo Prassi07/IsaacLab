@@ -9,7 +9,7 @@ from dataclasses import MISSING
 from isaaclab.managers import CommandTermCfg
 from isaaclab.managers.scene_entity_cfg import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, LEG_POSITION_GOAL_MARKER_CFG_BLUE, LEG_POSITION_GOAL_MARKER_CFG_RED
+from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, LEG_POSITION_GOAL_MARKER_CFG_BLUE, LEG_POSITION_GOAL_MARKER_CFG_RED, RED_ARROW_X_MARKER_CFG
 from isaaclab.utils import configclass
 
 from .null_command import NullCommand
@@ -92,9 +92,19 @@ class UniformVelocityCommandCfg(CommandTermCfg):
     )
     """The configuration for the current velocity visualization marker. Defaults to BLUE_ARROW_X_MARKER_CFG."""
 
+    goal_yaw_rate_visualizer_cfg: VisualizationMarkersCfg = RED_ARROW_X_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/yaw_rate_goal"
+    )
+    
+    current_yaw_rate_visualizer_cfg: VisualizationMarkersCfg = BLUE_ARROW_X_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/yaw_rate_current"
+    )
+    
     # Set the scale of the visualization markers to (0.5, 0.5, 0.5)
     goal_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
     current_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
+    goal_yaw_rate_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
+    current_yaw_rate_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
 
 
 @configclass

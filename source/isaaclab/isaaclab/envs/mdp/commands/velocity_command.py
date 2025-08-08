@@ -172,13 +172,22 @@ class UniformVelocityCommand(CommandTerm):
                 self.goal_vel_visualizer = VisualizationMarkers(self.cfg.goal_vel_visualizer_cfg)
                 # -- current
                 self.current_vel_visualizer = VisualizationMarkers(self.cfg.current_vel_visualizer_cfg)
+                
+                self.goal_yaw_rate_visualizer = VisualizationMarkers(self.cfg.goal_yaw_rate_visualizer_cfg)
+                self.current_yaw_rate_visualizer = VisualizationMarkers(self.cfg.current_yaw_rate_visualizer_cfg)
+                
             # set their visibility to true
             self.goal_vel_visualizer.set_visibility(True)
             self.current_vel_visualizer.set_visibility(True)
+            self.goal_yaw_rate_visualizer.set_visibility(True)
+            self.current_yaw_rate_visualizer.set_visibility(True)
         else:
             if hasattr(self, "goal_vel_visualizer"):
                 self.goal_vel_visualizer.set_visibility(False)
                 self.current_vel_visualizer.set_visibility(False)
+                self.goal_yaw_rate_visualizer.set_visibility(False)
+                self.current_yaw_rate_visualizer.set_visibility(False)
+
 
     def _debug_vis_callback(self, event):
         # check if robot is initialized
@@ -189,12 +198,22 @@ class UniformVelocityCommand(CommandTerm):
         # -- base state
         base_pos_w = self.robot.data.root_pos_w.clone()
         base_pos_w[:, 2] += 0.5
-        # -- resolve the scales and quaternions
+        # -- resolve the scales and quaternions for linear velocity
         vel_des_arrow_scale, vel_des_arrow_quat = self._resolve_xy_velocity_to_arrow(self.command[:, :2])
         vel_arrow_scale, vel_arrow_quat = self._resolve_xy_velocity_to_arrow(self.robot.data.root_lin_vel_b[:, :2])
-        # display markers
+        # display markers for linear velocity
         self.goal_vel_visualizer.visualize(base_pos_w, vel_des_arrow_quat, vel_des_arrow_scale)
         self.current_vel_visualizer.visualize(base_pos_w, vel_arrow_quat, vel_arrow_scale)
+        
+        base_pos_w[:, 2] += 0.5
+        # -- resolve the scales and quaternions for yaw rate
+        yaw_rate_des_arrow_scale, yaw_rate_des_arrow_quat = self._resolve_yaw_rate_to_arrow(self.command[:, 2])
+        yaw_rate_curr_arrow_scale, yaw_rate_curr_arrow_quat = self._resolve_yaw_rate_to_arrow(
+            self.robot.data.root_ang_vel_b[:, 2]
+        )
+        # display markers for yaw rate
+        self.goal_yaw_rate_visualizer.visualize(base_pos_w, yaw_rate_des_arrow_quat, yaw_rate_des_arrow_scale)
+        self.current_yaw_rate_visualizer.visualize(base_pos_w, yaw_rate_curr_arrow_quat, yaw_rate_curr_arrow_scale)
 
     """
     Internal helpers.
@@ -217,6 +236,30 @@ class UniformVelocityCommand(CommandTerm):
 
         return arrow_scale, arrow_quat
 
+    def _resolve_yaw_rate_to_arrow(self, yaw_rate: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Converts the yaw rate to a continuous arrow direction from -pi to pi."""
+        
+        # The arrow's length still represents the magnitude of the command.
+        default_scale = self.goal_yaw_rate_visualizer.cfg.markers["arrow"].scale
+        arrow_scale = torch.tensor(default_scale, device=self.device).repeat(yaw_rate.shape[0], 1)
+        # arrow_scale[:, 0] *= torch.abs(yaw_rate) * 3.0
+        
+        # --- NEW: Arrow direction logic ---
+        # Linearly scale the yaw_rate from [-1.5, 1.5] to [-pi, pi].
+        # The scaling factor is (output_range / input_range) = pi / 1.5.
+        scaling_factor = torch.pi / 1.5
+        yaw_angle = yaw_rate * scaling_factor
+
+        # --- The rest of the function remains the same ---
+        zeros = torch.zeros_like(yaw_angle)
+        arrow_quat = math_utils.quat_from_euler_xyz(zeros, zeros, yaw_angle)
+        
+        # convert everything back from base to world frame
+        base_quat_w = self.robot.data.root_quat_w
+        arrow_quat = math_utils.quat_mul(base_quat_w, arrow_quat)
+
+        return arrow_scale, arrow_quat
+        
 
 class NormalVelocityCommand(UniformVelocityCommand):
     """Command generator that generates a velocity command in SE(2) from a normal distribution.
