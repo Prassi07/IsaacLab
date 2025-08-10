@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+from isaaclab.sensors.ray_caster import patterns
 import isaaclab.sim as sim_utils
 import isaaclab.terrains as terrain_gen
 from isaaclab.envs import ViewerCfg
@@ -230,7 +231,7 @@ class SpotRewardsRoughCfg:
         weight=5.0,
         params={
             "mode_time": 0.3,
-            "velocity_threshold": 0.5,
+            "velocity_threshold": 0.25,
             "asset_cfg": SceneEntityCfg("robot"),
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
         },
@@ -266,7 +267,7 @@ class SpotRewardsRoughCfg:
         params={
             "std": 0.1,
             "max_err": 0.2,
-            "velocity_threshold": 0.5,
+            "velocity_threshold": 0.25,
             "synced_feet_pair_names": (("fl_foot", "hr_foot"), ("fr_foot", "hl_foot")),
             "asset_cfg": SceneEntityCfg("robot"),
             "sensor_cfg": SceneEntityCfg("contact_forces"),
@@ -318,7 +319,7 @@ class SpotRewardsRoughCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
             "stand_still_scale": 30.0,
-            "velocity_threshold": 0.5,
+            "velocity_threshold": 0.25,
         },
     )
     
@@ -401,17 +402,19 @@ class SpotRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # update sensor update periods
         # we tick all the sensors based on the smallest update period (physics update period)
         # self.scene.contact_forces.update_period = self.sim.dt
-
+        
         if self.scene.height_scanner is not None:
+            self.scene.height_scanner.pattern_cfg = patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0])
             self.scene.height_scanner.update_period = self.decimation * self.sim.dt
+            
         if self.scene.contact_forces is not None:
             self.scene.contact_forces.update_period = self.sim.dt
         
         self.scene.terrain = TerrainImporterCfg(
             prim_path="/World/ground",
             terrain_type="generator",
-            terrain_generator=ROUGH_STAIR_CFG,
-            max_init_terrain_level=ROUGH_STAIR_CFG.num_rows - 1,
+            terrain_generator=ROUGH_TERRAINS_CFG_3,
+            max_init_terrain_level=ROUGH_TERRAINS_CFG_3.num_rows - 1,
             collision_group=-1,
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="multiply",
